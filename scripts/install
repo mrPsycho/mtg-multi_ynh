@@ -49,7 +49,11 @@ chown -R "$app:" "/var/log/$app"
 
 [ "$prometheus" = "1" ] && prom_enabled="true" || prom_enabled="false"
 
-ynh_config_add --template="mtg.toml" --destination="$conf_dir/mtg.toml" --variable="secret=$secret"
+# Generate config via ynh_config_add (replaces __PORT__, __DNS__, __PROM_ENABLED__)
+# then inject secret via sed to avoid issues with '=' in base64 secrets
+# !!!SECRET!!! is used instead of __SECRET__ to avoid ynh_config_add from processing it
+ynh_config_add --template="mtg.toml" --destination="$conf_dir/mtg.toml"
+sed -i "s|!!!SECRET!!!|$secret|g" "$conf_dir/mtg.toml"
 
 #=================================================
 # SYSTEMD + SERVICE REGISTRATION
@@ -62,6 +66,10 @@ yunohost service add "$app" \
     --description "MTProto proxy for Telegram (mtg-multi)" \
     --needs_exposed_ports "$port" \
     --log="/var/log/$app/mtg.log"
+
+# Open port in firewall
+ynh_script_progression "Opening port $port in firewall..."
+yunohost firewall allow Both "$port" 2>&1 || ynh_print_warn "Could not open port $port in firewall"
 
 #=================================================
 # START SYSTEMD SERVICE

@@ -58,6 +58,10 @@ disk = "50M"
 
     [resources.install_dir]
 
+    [resources.ports]
+        [resources.ports.main]
+        default = "3128"
+
     [resources.sources.main]
     # x86_64 / amd64
     amd64.url = "https://github.com/dolonet/mtg-multi/releases/download/v1.11.0/mtg-multi-1.11.0-linux-amd64.tar.gz"

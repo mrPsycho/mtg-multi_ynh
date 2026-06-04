@@ -19,4 +19,4 @@ metric-prefix = "mtg"
 # Run: mtg-multi generate-secret <domain>
 # Or use the web interface to add your own secrets.
 [secrets]
-__SECRET__ = "DefaultSecretReplaceMe"
+"default" = "!!!SECRET!!!"
