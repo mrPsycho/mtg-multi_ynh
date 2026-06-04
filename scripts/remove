@@ -6,9 +6,6 @@
 
 source /usr/share/yunohost/helpers
 
-conf_dir=$install_dir/conf
-www_dir=$install_dir/www
-
 #=================================================
 # STOP AND REMOVE SERVICE
 #=================================================
@@ -22,21 +19,13 @@ fi
 ynh_config_remove_systemd
 
 #=================================================
-# REMOVE SUDOERS RULES
-#=================================================
-ynh_script_progression "Removing sudoers rules..."
-
-ynh_safe_rm "/etc/sudoers.d/$app"
-
-#=================================================
 # REMOVE CONFIGURATION FILES
 # Note: system user, install_dir, apt packages, and firewall ports
 # are automatically removed by YunoHost via [resources]
 #=================================================
 ynh_script_progression "Removing configuration files..."
 
-ynh_safe_rm "$conf_dir"
-ynh_safe_rm "$www_dir"
+ynh_safe_rm "$install_dir/conf"
 
 #=================================================
 # END OF SCRIPT

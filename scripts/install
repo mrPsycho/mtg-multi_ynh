@@ -7,7 +7,6 @@
 source /usr/share/yunohost/helpers
 
 conf_dir=$install_dir/conf
-www_dir=$install_dir/www
 
 #=================================================
 # FETCH AND INSTALL MTG-MULTI BINARY
@@ -27,51 +26,11 @@ mkdir -p "$conf_dir"
 
 # Create log directory
 mkdir -p /var/log/$app
-chown -R "$app:www-data" "/var/log/$app"
+chown -R "$app:" "/var/log/$app"
 
 [ "$prometheus" = "1" ] && prom_enabled="true" || prom_enabled="false"
 
 ynh_config_add --template="mtg.toml" --destination="$conf_dir/mtg.toml"
-
-#=================================================
-# SETUP WEB INTERFACE
-#=================================================
-ynh_script_progression "Setting up web interface..."
-
-mkdir -p "$www_dir"
-
-# Copy PHP web interface
-ynh_config_add --template="index.php" --destination="$www_dir/index.php"
-
-# Set proper permissions
-chown -R "$app:www-data" "$www_dir"
-chmod 755 "$www_dir"
-chmod 644 "$www_dir/index.php"
-
-#=================================================
-# GRANT WWW-DATA ACCESS TO CONFIG
-#=================================================
-ynh_script_progression "Granting web server access to configuration..."
-
-# Add www-data to the app's group for config write access
-ynh_hide_warnings usermod -a -G "$app" www-data
-
-# Make the config directory group-writable so www-data can modify secrets
-chown -R "$app:$app" "$conf_dir"
-chmod -R 775 "$conf_dir"
-chmod 664 "$conf_dir/mtg.toml"
-
-# Ensure the binary is executable by the group too (for secret generation via web)
-chmod 755 "$install_dir/mtg-multi"
-
-# Allow www-data to restart the service via sudo (passwordless)
-if [ ! -f /etc/sudoers.d/$app ]; then
-    echo "www-data ALL=($app) NOPASSWD: /usr/bin/systemctl restart $app" > /etc/sudoers.d/$app
-    echo "www-data ALL=($app) NOPASSWD: /usr/bin/systemctl start $app" >> /etc/sudoers.d/$app
-    echo "www-data ALL=($app) NOPASSWD: /usr/bin/systemctl stop $app" >> /etc/sudoers.d/$app
-    chmod 440 /etc/sudoers.d/$app
-    ynh_print_info "Created sudoers rule for www-data to manage $app service"
-fi
 
 #=================================================
 # SYSTEMD + SERVICE REGISTRATION
@@ -83,7 +42,7 @@ ynh_config_add_systemd
 yunohost service add "$app" \
     --description "MTProto proxy for Telegram (mtg-multi)" \
     --needs_exposed_ports "$port" \
-    --log="/var/log/$app/mtg.log" 
+    --log="/var/log/$app/mtg.log"
 
 #=================================================
 # START SYSTEMD SERVICE

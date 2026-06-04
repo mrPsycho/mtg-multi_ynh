@@ -20,7 +20,7 @@ yunohost = ">= 12.1.38"
 helpers_version = "2.1"
 architectures = "all"
 multi_instance = false
-type = "web"
+type = "service"
 
 ldap = "not_relevant"
 
@@ -59,7 +59,3 @@ disk = "50M"
     # arm64 / aarch64
     arm64.url = "https://github.com/dolonet/mtg-multi/releases/download/v1.11.0/mtg-multi-1.11.0-linux-arm64.tar.gz"
     arm64.sha256 = "87e9c5d293cdb0c1dbc988690bab99bc3f16526c7196e812d33354bbfd9a6002"
-
-    [resources.nginx]
-
-    [resources.php_pools]

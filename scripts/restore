@@ -1,12 +1,6 @@
 #!/bin/bash
 
 #=================================================
-# COMMON VARIABLES AND HELPERS
-#=================================================
-
-source /usr/share/yunohost/helpers
-
-#=================================================
 # RESTORE THE APP MAIN DIR
 #=================================================
 ynh_script_progression "Restoring the app main directory..."
@@ -23,10 +17,10 @@ ynh_config_add_systemd
 yunohost service add "$app" \
     --description "MTProto proxy for Telegram" \
     --needs_exposed_ports "$port" \
-    --log="/var/log/$app/mtg.log" 
+    --log="/var/log/$app/mtg.log"
 
 #=================================================
-# RELOAD NGINX AND PHP-FPM OR THE APP SERVICE
+# RELOAD THE APP SERVICE
 #=================================================
 ynh_script_progression "Reloading $app's service..."
 
