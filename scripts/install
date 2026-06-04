@@ -56,7 +56,7 @@ ynh_config_add --template="mtg.toml" --destination="$conf_dir/mtg.toml"
 sed -i "s|!!!SECRET!!!|$secret|g" "$conf_dir/mtg.toml"
 
 #=================================================
-# SETUP WEB INTERFACE (index.php + nginx)
+# SETUP WEB INTERFACE (index.html + nginx)
 #=================================================
 ynh_script_progression "Setting up web interface..."
 
@@ -77,9 +77,6 @@ else
     ynh_config_add --template="nginx.conf" --destination="$nginx_conf_path"
     ynh_store_file_checksum "$nginx_conf_path"
     ynh_systemctl --service=nginx --action=reload
-
-    # Grant access to the app URL
-    yunohost app addaccess "$app" 2>&1 || ynh_print_warn "Could not add URL access for $app"
 fi
 
 #=================================================

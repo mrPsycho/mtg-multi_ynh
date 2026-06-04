@@ -1,85 +1,3 @@
-<?php
-/**
- * MTG-Multi — информационная страница для YunoHost
- *
- * Показывает статус прокси, секреты и параметры подключения.
- */
-
-// Читаем конфигурационный файл mtg.toml
-$config_file = __DIR__ . '/mtg.toml';
-$config = file_exists($config_file) ? parse_mtg_toml($config_file) : null;
-
-// Парсинг TOML (упрощённый, только для нашей структуры)
-function parse_mtg_toml($file) {
-    $content = file_get_contents($file);
-    $lines = explode("\n", $content);
-    $result = [];
-    $section = 'root';
-
-    foreach ($lines as $line) {
-        $line = trim($line);
-        if (empty($line) || str_starts_with($line, '#')) continue;
-
-        if (str_starts_with($line, '[') && str_ends_with($line, ']')) {
-            $section = trim(substr($line, 1, -1));
-            continue;
-        }
-
-        if (preg_match('/^"([^"]+)"\s*=\s*"([^"]*)"$/', $line, $m)) {
-            $result[$section][$m[1]] = $m[2];
-        } elseif (preg_match('/^([a-zA-Z0-9_-]+)\s*=\s*"([^"]*)"$/', $line, $m)) {
-            $result[$section][$m[1]] = $m[2];
-        } elseif (preg_match('/^([a-zA-Z0-9_-]+)\s*=\s*(true|false)$/', $line, $m)) {
-            $result[$section][$m[1]] = $m[2] === 'true';
-        } elseif (preg_match('/^([a-zA-Z0-9_-]+)\s*=\s*"([^"]*)"$/', $line, $m)) {
-            $result['root'][$m[1]] = $m[2];
-        }
-    }
-
-    return $result;
-}
-
-function str_starts_with($haystack, $needle) {
-    return substr($haystack, 0, strlen($needle)) === $needle;
-}
-
-function str_ends_with($haystack, $needle) {
-    $len = strlen($needle);
-    return $len === 0 || substr($haystack, -$len) === $needle;
-}
-
-// Получаем информацию о порте из конфига
-$bind_to = $config['root']['bind-to'] ?? '0.0.0.0:3128';
-$bind_parts = explode(':', $bind_to);
-$proxy_port = end($bind_parts);
-
-$api_bind = $config['root']['api-bind-to'] ?? '127.0.0.1:9090';
-$api_parts = explode(':', $api_bind);
-$api_port = end($api_parts);
-
-$dns = $config['network']['dns'] ?? '1.1.1.1';
-$prometheus_enabled = $config['stats.prometheus']['enabled'] ?? false;
-$secrets = $config['secrets'] ?? [];
-
-// Пытаемся получить статус через API
-$api_url = "http://127.0.0.1:$api_port";
-$api_status = null;
-$api_error = null;
-
-if ($api_port) {
-    $ctx = stream_context_create(['http' => ['timeout' => 2, 'method' => 'GET']]);
-    $api_response = @file_get_contents("$api_url/stats", false, $ctx);
-    if ($api_response !== false) {
-        $api_status = json_decode($api_response, true);
-    } else {
-        $api_error = 'API недоступен';
-    }
-}
-
-// Определяем домен YunoHost
-$domain = getenv('YNH_DOMAIN') ?: ($_SERVER['HTTP_HOST'] ?? 'mtg.local');
-
-?>
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -145,9 +63,9 @@ $domain = getenv('YNH_DOMAIN') ?: ($_SERVER['HTTP_HOST'] ?? 'mtg.local');
             font-size: 0.85rem;
             font-weight: 600;
         }
+        .status-badge.loading { background: #fef5e7; color: var(--warning); }
         .status-badge.online { background: #e8f8f0; color: var(--success); }
         .status-badge.offline { background: #fde8e8; color: var(--danger); }
-        .status-badge.warning { background: #fef5e7; color: var(--warning); }
         .info-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -207,6 +125,14 @@ $domain = getenv('YNH_DOMAIN') ?: ($_SERVER['HTTP_HOST'] ?? 'mtg.local');
             margin-top: 8px;
             word-break: break-all;
         }
+        .error-box {
+            background: #fde8e8;
+            border: 1px solid #f8d7da;
+            border-radius: 8px;
+            padding: 16px;
+            margin-top: 12px;
+            color: var(--danger);
+        }
         .footer {
             text-align: center;
             color: var(--text-muted);
@@ -226,51 +152,38 @@ $domain = getenv('YNH_DOMAIN') ?: ($_SERVER['HTTP_HOST'] ?? 'mtg.local');
             MTG-Multi Proxy
             <small>MTProto proxy для Telegram</small>
         </h1>
-        <p class="subtitle">
-            Статус прокси-сервера и параметры подключения
+        <p class="subtitle" id="subtitle">
+            Загрузка статуса прокси-сервера...
         </p>
 
         <!-- Статус сервера -->
         <div class="card">
             <h2>Статус сервера</h2>
-            <?php if ($api_status !== null): ?>
-                <span class="status-badge online">🟢 Онлайн</span>
-                <p style="margin-top: 12px;">
-                    Прокси-сервер работает и принимает подключения.
-                </p>
-            <?php elseif ($api_error !== null): ?>
-                <span class="status-badge warning">🟡 API недоступен</span>
-                <p style="margin-top: 12px;">
-                    Прокси-сервер запущен, но API статистики недоступен.
-                    Проверьте настройки <code>api-bind-to</code> в конфигурации.
-                </p>
-            <?php else: ?>
-                <span class="status-badge offline">🔴 Статус неизвестен</span>
-                <p style="margin-top: 12px;">
-                    Не удалось подключиться к прокси-серверу. Возможно, он ещё запускается.
-                </p>
-            <?php endif; ?>
+            <div id="server-status">
+                <span class="status-badge loading">🟡 Загрузка...</span>
+                <p style="margin-top: 12px;">Подключение к API статистики...</p>
+            </div>
         </div>
 
         <!-- Параметры подключения -->
         <div class="card">
             <h2>Параметры подключения</h2>
-            <div class="info-grid">
+            <div class="info-grid" id="params-grid">
                 <div class="info-item">
                     <div class="label">Порт прокси</div>
-                    <div class="value mono"><?= htmlspecialchars($proxy_port) ?></div>
+                    <div class="value mono" id="proxy-port">—</div>
                 </div>
                 <div class="info-item">
                     <div class="label">DNS резольвер</div>
-                    <div class="value mono"><?= htmlspecialchars($dns) ?></div>
+                    <div class="value mono" id="dns-resolver">—</div>
                 </div>
                 <div class="info-item">
                     <div class="label">Prometheus метрики</div>
-                    <div class="value"><?= $prometheus_enabled ? '✅ Включены' : '❌ Отключены' ?></div>
+                    <div class="value" id="prometheus-status">—</div>
                 </div>
                 <div class="info-item">
                     <div class="label">API порт</div>
-                    <div class="value mono"><?= htmlspecialchars($api_port) ?></div>
+                    <div class="value mono" id="api-port">—</div>
                 </div>
             </div>
 
@@ -279,7 +192,7 @@ $domain = getenv('YNH_DOMAIN') ?: ($_SERVER['HTTP_HOST'] ?? 'mtg.local');
                 <p style="margin-top: 8px; font-size: 0.9rem;">
                     Используйте этот адрес для подключения в Telegram:
                 </p>
-                <code>server = <?= htmlspecialchars($domain) ?>:<?= htmlspecialchars($proxy_port) ?></code>
+                <code id="connection-string">server = ...</code>
                 <p style="margin-top: 8px; font-size: 0.85rem; color: var(--text-muted);">
                     Замените домен на IP-адрес сервера, если DNS не настроен.
                 </p>
@@ -289,27 +202,9 @@ $domain = getenv('YNH_DOMAIN') ?: ($_SERVER['HTTP_HOST'] ?? 'mtg.local');
         <!-- Секреты -->
         <div class="card">
             <h2>MTProto секреты</h2>
-            <?php if (empty($secrets)): ?>
-                <p style="color: var(--warning);">
-                    ⚠️ Секреты не настроены. Прокси не будет принимать подключения.
-                </p>
-                <p style="margin-top: 8px; font-size: 0.9rem;">
-                    Сгенерируйте секрет с помощью команды:
-                </p>
-                <code style="display: block; padding: 8px 12px; background: var(--bg); border-radius: 6px; margin-top: 8px; font-size: 0.85rem;">
-                    sudo mtg-multi generate-secret google.com
-                </code>
-            <?php else: ?>
-                <?php foreach ($secrets as $name => $secret): ?>
-                    <div class="secret-item">
-                        <div class="secret-name">🔑 <?= htmlspecialchars($name) ?></div>
-                        <div class="secret-value"><?= htmlspecialchars($secret) ?></div>
-                    </div>
-                <?php endforeach; ?>
-                <p style="margin-top: 12px; font-size: 0.85rem; color: var(--text-muted);">
-                    Для подключения используйте секрет вместе с адресом сервера.
-                </p>
-            <?php endif; ?>
+            <div id="secrets-list">
+                <p style="color: var(--warning);">⚠️ Загрузка секретов...</p>
+            </div>
         </div>
 
         <!-- Информация о системе -->
@@ -322,7 +217,7 @@ $domain = getenv('YNH_DOMAIN') ?: ($_SERVER['HTTP_HOST'] ?? 'mtg.local');
                 </div>
                 <div class="info-item">
                     <div class="label">Директория установки</div>
-                    <div class="value mono" style="font-size: 0.8rem;"><?= __DIR__ ?></div>
+                    <div class="value mono" style="font-size: 0.8rem;" id="install-dir">—</div>
                 </div>
             </div>
         </div>
@@ -332,5 +227,140 @@ $domain = getenv('YNH_DOMAIN') ?: ($_SERVER['HTTP_HOST'] ?? 'mtg.local');
             <a href="https://github.com/dolonet/mtg-multi" target="_blank" rel="noopener">GitHub</a>
         </div>
     </div>
+
+    <script>
+    // Parse TOML-like config from the API
+    async function fetchConfig() {
+        try {
+            // Try to fetch stats from the API
+            const statsResp = await fetch('http://127.0.0.1:9090/stats');
+            if (statsResp.ok) {
+                const stats = await statsResp.json();
+                document.getElementById('server-status').innerHTML = 
+                    '<span class="status-badge online">🟢 Онлайн</span>' +
+                    '<p style="margin-top: 12px;">' +
+                    'Прокси-сервер работает и принимает подключения.<br>' +
+                    '<small>Запущен: ' + new Date(stats.started_at).toLocaleString() + 
+                    ' | Соединений: ' + stats.total_connections + '</small>' +
+                    '</p>';
+                document.getElementById('subtitle').textContent = 'Прокси-сервер работает';
+            }
+        } catch (e) {
+            document.getElementById('server-status').innerHTML = 
+                '<span class="status-badge offline">🔴 Статус неизвестен</span>' +
+                '<p style="margin-top: 12px;">' +
+                'Не удалось подключиться к API статистики. Возможно, сервер ещё запускается.' +
+                '</p>';
+        }
+    }
+
+    // Fetch config file and parse it client-side
+    async function fetchConfigFile() {
+        try {
+            const resp = await fetch('mtg.toml');
+            if (!resp.ok) throw new Error('Config not accessible');
+            const text = await resp.text();
+            const config = parseTOML(text);
+            
+            // Extract proxy port
+            const bindTo = config['bind-to'] || '0.0.0.0:3128';
+            const proxyPort = bindTo.split(':').pop();
+            document.getElementById('proxy-port').textContent = proxyPort;
+            
+            // Extract API port
+            const apiBind = config['api-bind-to'] || '127.0.0.1:9090';
+            const apiPort = apiBind.split(':').pop();
+            document.getElementById('api-port').textContent = apiPort;
+            
+            // Extract DNS
+            const dns = config['network']?.dns || '1.1.1.1';
+            document.getElementById('dns-resolver').textContent = dns;
+            
+            // Extract Prometheus
+            const promEnabled = config['stats.prometheus']?.enabled;
+            document.getElementById('prometheus-status').textContent = 
+                promEnabled ? '✅ Включены' : '❌ Отключены';
+            
+            // Extract secrets
+            const secrets = config['secrets'] || {};
+            const secretsDiv = document.getElementById('secrets-list');
+            if (Object.keys(secrets).length === 0) {
+                secretsDiv.innerHTML = 
+                    '<p style="color: var(--warning);">⚠️ Секреты не настроены.</p>';
+            } else {
+                let html = '';
+                for (const [name, secret] of Object.entries(secrets)) {
+                    html += '<div class="secret-item">' +
+                        '<div class="secret-name">🔑 ' + escapeHtml(name) + '</div>' +
+                        '<div class="secret-value">' + escapeHtml(secret) + '</div>' +
+                        '</div>';
+                }
+                secretsDiv.innerHTML = html;
+            }
+            
+            // Build connection string
+            const domain = window.location.hostname || 'mtg.local';
+            document.getElementById('connection-string').textContent = 
+                'server = ' + domain + ':' + proxyPort;
+            
+            // Install dir
+            document.getElementById('install-dir').textContent = '/var/www/mtg-multi';
+            
+        } catch (e) {
+            console.error('Failed to load config:', e);
+            document.getElementById('params-grid').innerHTML = 
+                '<div class="error-box">' +
+                'Не удалось загрузить конфигурацию. ' +
+                'Убедитесь, что файл mtg.toml доступен для чтения.' +
+                '</div>';
+        }
+    }
+
+    // Simple TOML parser (handles our config structure)
+    function parseTOML(text) {
+        const result = {};
+        let currentSection = result;
+        
+        text.split('\n').forEach(line => {
+            line = line.trim();
+            if (!line || line.startsWith('#')) return;
+            
+            // Section header
+            const sectionMatch = line.match(/^\[([^\]]+)\]$/);
+            if (sectionMatch) {
+                const parts = sectionMatch[1].split('.');
+                currentSection = result;
+                parts.forEach(part => {
+                    if (!currentSection[part]) currentSection[part] = {};
+                    currentSection = currentSection[part];
+                });
+                return;
+            }
+            
+            // Key = "value"
+            const kvMatch = line.match(/^(?:'([^']+)'|"([^"]+)"|([a-zA-Z0-9_-]+))\s*=\s*(?:"([^"]*)"|'([^']*)'|(true|false|\d+(?:\.\d+)?))$/);
+            if (kvMatch) {
+                const key = kvMatch[1] || kvMatch[2] || kvMatch[3];
+                let value = kvMatch[4] || kvMatch[5] || kvMatch[6];
+                if (value === 'true') value = true;
+                else if (value === 'false') value = false;
+                else if (!isNaN(value) && value !== '') value = Number(value);
+                currentSection[key] = value;
+            }
+        });
+        
+        return result;
+    }
+
+    function escapeHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+
+    // Load everything on page load
+    fetchConfig();
+    fetchConfigFile();
+    </script>
 </body>
 </html>
