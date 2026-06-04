@@ -1,5 +1,4 @@
 debug = false
-secret = "__MTG_SECRET__"
 bind-to = "0.0.0.0:__PORT__"
 api-bind-to = "127.0.0.1:9090"
 
@@ -16,9 +15,6 @@ bind-to = "127.0.0.1:3129"
 http-path = "/"
 metric-prefix = "mtg"
 
-# Per-user secrets — add users here
-# To generate a secret for a user:
-#   sudo -u __APP__ __INSTALL_DIR__/mtg-multi generate-secret --hex <fronting-domain>
-# [secrets]
-# alice = "ee..."
-# bob   = "ee..."
+# Per-user secrets — managed via web interface
+# Users can create/update/delete their own secrets
+[secrets]

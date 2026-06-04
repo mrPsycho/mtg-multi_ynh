@@ -4,8 +4,7 @@ test_format = 1.0
 
 [default]
     args.port = "3128"
-    args.secret = "google.com"
     args.dns = "1.1.1.1"
     args.prometheus = false
 
-    exclude = ["install.root", "install.subdir", "install.multi", "install.multi", "change_url"]
+    exclude = ["install.root", "install.multi", "change_url"]

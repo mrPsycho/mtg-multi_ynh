@@ -20,6 +20,7 @@ yunohost = ">= 12.1.38"
 helpers_version = "2.1"
 architectures = "all"
 multi_instance = false
+type = "path"
 
 ldap = "not_relevant"
 sso = "relevant"
@@ -34,12 +35,6 @@ disk = "50M"
     ask.en = "Choose a port for the proxy to bind to"
     ask.fr = "Choisissez un port auquel le proxy doit se connecter"
     default = "3128"
-
-    [install.secret]
-    type = "string"
-    ask.en = "Enter the MTProto Secret (Starts with 'ee...' or provide a fronting domain like google.com to auto-generate)"
-    ask.fr = "Saisissez le secret MTProto (commençant par « ee... » ou indiquez un domaine de base tel que google.com pour qu'il soit généré automatiquement)"
-    default = "google.com"
 
     [install.dns]
     type = "string"

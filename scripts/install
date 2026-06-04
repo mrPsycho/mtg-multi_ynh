@@ -19,24 +19,9 @@ ynh_setup_source --dest_dir="$install_dir"
 chmod +x "$install_dir/mtg-multi"
 
 #=================================================
-# GENERATE/VALIDATE SECRET
-#=================================================
-ynh_script_progression "Adding $app's configuration files..."
-
-if [[ "$secret" == ee* ]]; then
-    mtg_secret="$secret"
-else
-    ynh_print_info "Generating MTProto secret for fronting domain: $secret"
-    mtg_secret=$("$install_dir/mtg-multi" generate-secret --hex "$secret")
-    [ -z "$mtg_secret" ] && ynh_die "Failed to generate mtg-multi secret for domain $secret"
-    ynh_print_info "Generated secret: $mtg_secret"
-fi
-
-ynh_app_setting_set --key=mtg_secret --value="$mtg_secret"
-
-#=================================================
 # WRITE CONFIGURATION
 #=================================================
+ynh_script_progression "Adding $app's configuration files..."
 
 mkdir -p "$conf_dir"
 
@@ -62,6 +47,31 @@ ynh_config_add --template="index.php" --destination="$www_dir/index.php"
 chown -R "$app:www-data" "$www_dir"
 chmod 755 "$www_dir"
 chmod 644 "$www_dir/index.php"
+
+#=================================================
+# GRANT WWW-DATA ACCESS TO CONFIG
+#=================================================
+ynh_script_progression "Granting web server access to configuration..."
+
+# Add www-data to the app's group for config write access
+ynh_hide_warnings usermod -a -G "$app" www-data
+
+# Make the config directory group-writable so www-data can modify secrets
+chown -R "$app:$app" "$conf_dir"
+chmod -R 775 "$conf_dir"
+chmod 664 "$conf_dir/mtg.toml"
+
+# Ensure the binary is executable by the group too (for secret generation via web)
+chmod 755 "$install_dir/mtg-multi"
+
+# Allow www-data to restart the service via sudo (passwordless)
+if [ ! -f /etc/sudoers.d/$app ]; then
+    echo "www-data ALL=($app) NOPASSWD: /usr/bin/systemctl restart $app" > /etc/sudoers.d/$app
+    echo "www-data ALL=($app) NOPASSWD: /usr/bin/systemctl start $app" >> /etc/sudoers.d/$app
+    echo "www-data ALL=($app) NOPASSWD: /usr/bin/systemctl stop $app" >> /etc/sudoers.d/$app
+    chmod 440 /etc/sudoers.d/$app
+    ynh_print_info "Created sudoers rule for www-data to manage $app service"
+fi
 
 #=================================================
 # SYSTEMD + SERVICE REGISTRATION
