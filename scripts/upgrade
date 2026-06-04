@@ -87,7 +87,10 @@ cp "$conf_dir/index.php" "$install_dir/index.php"
 chown "$app:" "$install_dir/index.php"
 
 # Update nginx configuration
-ynh_config_add_nginx
+ynh_add_nginx_config
+
+# Grant access to the app URL
+yunohost app addaccess "$app" 2>&1 || ynh_print_warn "Could not add URL access for $app"
 
 #=================================================
 # UPDATE SYSTEMD CONFIG

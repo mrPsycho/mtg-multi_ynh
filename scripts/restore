@@ -12,7 +12,10 @@ ynh_restore "$install_dir"
 #=================================================
 ynh_script_progression "Restoring nginx configuration..."
 
-ynh_config_add_nginx
+ynh_add_nginx_config
+
+# Grant access to the app URL
+yunohost app addaccess "$app" 2>&1 || ynh_print_warn "Could not add URL access for $app"
 
 #=================================================
 # RESTORE SYSTEM CONFIGURATIONS
