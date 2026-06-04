@@ -20,10 +20,9 @@ yunohost = ">= 12.1.38"
 helpers_version = "2.1"
 architectures = "all"
 multi_instance = false
-type = "path"
+type = "web"
 
 ldap = "not_relevant"
-sso = "relevant"
 
 ram.build = "50M"
 ram.runtime = "50M"
