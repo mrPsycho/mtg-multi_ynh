@@ -41,6 +41,12 @@ disk = "50M"
     ask.fr = "Saisissez l'adresse IP du résolveur DNS"
     default = "1.1.1.1"
 
+    [install.frontend_domain]
+    type = "string"
+    ask.en = "Enter a frontend domain to generate a valid secret (e.g. google.com). Leave empty to use a default fake secret."
+    ask.fr = "Saisissez un domaine frontend pour générer un secret valide (ex: google.com). Laissez vide pour utiliser un secret factice par défaut."
+    default = ""
+
     [install.prometheus]
     type = "boolean"
     ask.en = "Enable Prometheus metrics?"

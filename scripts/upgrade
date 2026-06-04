@@ -33,13 +33,33 @@ if [ -f "$install_dir/mtg" ]; then
 fi
 
 #=================================================
+# PRESERVE OR GENERATE SECRET
+#=================================================
+ynh_script_progression "Checking MTProto secret..."
+
+# Try to read existing secret from the current config
+if [ -f "$conf_dir/mtg.toml" ]; then
+    existing_secret=$(grep -oP '^\s*\S+\s*=\s*"\K[^"]+' "$conf_dir/mtg.toml" | head -n1)
+fi
+
+if [ -n "$existing_secret" ] && [ "$existing_secret" != "DefaultSecretReplaceMe" ]; then
+    # Keep the existing valid secret
+    secret="$existing_secret"
+    ynh_print_info "Preserving existing secret"
+else
+    # No valid secret found — use default fake secret
+    ynh_print_info "No valid secret found — using default fake secret (replace it later!)"
+    secret="DefaultSecretReplaceMe"
+fi
+
+#=================================================
 # UPDATE A CONFIG FILE
 #=================================================
 ynh_script_progression "Updating $app's configuration files..."
 
 [ "$prometheus" = "1" ] && prom_enabled="true" || prom_enabled="false"
 
-ynh_config_add --template="mtg.toml" --destination="$conf_dir/mtg.toml"
+ynh_config_add --template="mtg.toml" --destination="$conf_dir/mtg.toml" --variable="secret=$secret"
 
 # Ensure log directory exists
 mkdir -p /var/log/$app

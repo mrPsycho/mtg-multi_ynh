@@ -18,6 +18,25 @@ ynh_setup_source --dest_dir="$install_dir"
 chmod +x "$install_dir/mtg-multi"
 
 #=================================================
+# GENERATE SECRET
+#=================================================
+ynh_script_progression "Generating MTProto secret..."
+
+if [ -n "$frontend_domain" ]; then
+    # Generate a valid secret using the frontend domain
+    secret=$("$install_dir/mtg-multi" generate-secret "$frontend_domain" 2>/dev/null | tail -n1)
+    if [ -z "$secret" ]; then
+        ynh_print_warn "Failed to generate secret from domain, using default fake secret"
+        secret="DefaultSecretReplaceMe"
+    else
+        ynh_print_info "Secret successfully generated from domain $frontend_domain"
+    fi
+else
+    ynh_print_info "No frontend domain provided — using default fake secret (replace it later!)"
+    secret="DefaultSecretReplaceMe"
+fi
+
+#=================================================
 # WRITE CONFIGURATION
 #=================================================
 ynh_script_progression "Adding $app's configuration files..."
@@ -30,7 +49,7 @@ chown -R "$app:" "/var/log/$app"
 
 [ "$prometheus" = "1" ] && prom_enabled="true" || prom_enabled="false"
 
-ynh_config_add --template="mtg.toml" --destination="$conf_dir/mtg.toml"
+ynh_config_add --template="mtg.toml" --destination="$conf_dir/mtg.toml" --variable="secret=$secret"
 
 #=================================================
 # SYSTEMD + SERVICE REGISTRATION
