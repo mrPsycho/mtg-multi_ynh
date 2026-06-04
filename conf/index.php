@@ -68,7 +68,7 @@ $api_error = null;
 
 if ($api_port) {
     $ctx = stream_context_create(['http' => ['timeout' => 2, 'method' => 'GET']]);
-    $api_response = @file_get_contents("$api_url/status", false, $ctx);
+    $api_response = @file_get_contents("$api_url/stats", false, $ctx);
     if ($api_response !== false) {
         $api_status = json_decode($api_response, true);
     } else {
@@ -318,7 +318,7 @@ $domain = getenv('YNH_DOMAIN') ?: ($_SERVER['HTTP_HOST'] ?? 'mtg.local');
             <div class="info-grid">
                 <div class="info-item">
                     <div class="label">Версия приложения</div>
-                    <div class="value">1.11.0~ynh2</div>
+                    <div class="value">1.11.0~ynh3</div>
                 </div>
                 <div class="info-item">
                     <div class="label">Директория установки</div>

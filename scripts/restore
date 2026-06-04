@@ -12,10 +12,22 @@ ynh_restore "$install_dir"
 #=================================================
 ynh_script_progression "Restoring nginx configuration..."
 
-ynh_add_nginx_config
+# Get the first YunoHost domain for the nginx config
+domain=$(yunohost domain list --output-as json 2>/dev/null | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('domains',[])[0])" 2>/dev/null)
+if [ -z "$domain" ]; then
+    ynh_print_warn "No domain found, skipping nginx configuration"
+else
+    # Set path for the nginx template (service apps use root path)
+    path="/"
+    nginx_conf_path="/etc/nginx/conf.d/$domain.d/$app.conf"
+    mkdir -p "/etc/nginx/conf.d/$domain.d"
+    ynh_config_add --template="nginx.conf" --destination="$nginx_conf_path"
+    ynh_store_file_checksum "$nginx_conf_path"
+    ynh_systemctl --service=nginx --action=reload
 
-# Grant access to the app URL
-yunohost app addaccess "$app" 2>&1 || ynh_print_warn "Could not add URL access for $app"
+    # Grant access to the app URL
+    yunohost app addaccess "$app" 2>&1 || ynh_print_warn "Could not add URL access for $app"
+fi
 
 #=================================================
 # RESTORE SYSTEM CONFIGURATIONS
