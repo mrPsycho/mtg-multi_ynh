@@ -7,6 +7,7 @@
 source /usr/share/yunohost/helpers
 
 conf_dir=$install_dir/conf
+www_dir=$install_dir/www
 
 #=================================================
 # FETCH AND INSTALL MTG-MULTI BINARY
@@ -46,6 +47,21 @@ chown -R "$app:www-data" "/var/log/$app"
 [ "$prometheus" = "1" ] && prom_enabled="true" || prom_enabled="false"
 
 ynh_config_add --template="mtg.toml" --destination="$conf_dir/mtg.toml"
+
+#=================================================
+# SETUP WEB INTERFACE
+#=================================================
+ynh_script_progression "Setting up web interface..."
+
+mkdir -p "$www_dir"
+
+# Copy PHP web interface
+ynh_config_add --template="index.php" --destination="$www_dir/index.php"
+
+# Set proper permissions
+chown -R "$app:www-data" "$www_dir"
+chmod 755 "$www_dir"
+chmod 644 "$www_dir/index.php"
 
 #=================================================
 # SYSTEMD + SERVICE REGISTRATION

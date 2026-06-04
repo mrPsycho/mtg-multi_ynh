@@ -15,3 +15,10 @@ enabled = __PROM_ENABLED__
 bind-to = "127.0.0.1:3129"
 http-path = "/"
 metric-prefix = "mtg"
+
+# Per-user secrets — add users here
+# To generate a secret for a user:
+#   sudo -u __APP__ __INSTALL_DIR__/mtg-multi generate-secret --hex <fronting-domain>
+# [secrets]
+# alice = "ee..."
+# bob   = "ee..."

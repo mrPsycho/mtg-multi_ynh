@@ -18,4 +18,3 @@ ynh_backup "$install_dir"
 #=================================================
 
 ynh_print_info "Backup script completed for $app. (YunoHost will then actually copy those files to the archive)."
-

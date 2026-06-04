@@ -7,6 +7,7 @@
 source /usr/share/yunohost/helpers
 
 conf_dir=$install_dir/conf
+www_dir=$install_dir/www
 
 #=================================================
 # STOP AND REMOVE SERVICE
@@ -28,6 +29,7 @@ ynh_config_remove_systemd
 ynh_script_progression "Removing configuration files..."
 
 ynh_safe_rm "$conf_dir"
+ynh_safe_rm "$www_dir"
 
 #=================================================
 # END OF SCRIPT

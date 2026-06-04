@@ -7,6 +7,7 @@
 source /usr/share/yunohost/helpers
 
 conf_dir=$install_dir/conf
+www_dir=$install_dir/www
 
 #=================================================
 # STOP SERVICE
@@ -49,6 +50,21 @@ ynh_config_add --template="mtg.toml" --destination="$conf_dir/mtg.toml"
 # Ensure log directory exists
 mkdir -p /var/log/$app
 chown $app: /var/log/$app
+
+#=================================================
+# UPDATE WEB INTERFACE
+#=================================================
+ynh_script_progression "Updating web interface..."
+
+mkdir -p "$www_dir"
+
+# Copy PHP web interface
+ynh_config_add --template="index.php" --destination="$www_dir/index.php"
+
+# Set proper permissions
+chown -R "$app:www-data" "$www_dir"
+chmod 755 "$www_dir"
+chmod 644 "$www_dir/index.php"
 
 #=================================================
 # UPDATE SYSTEMD CONFIG
