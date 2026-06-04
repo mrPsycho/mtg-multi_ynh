@@ -56,6 +56,18 @@ ynh_config_add --template="mtg.toml" --destination="$conf_dir/mtg.toml"
 sed -i "s|!!!SECRET!!!|$secret|g" "$conf_dir/mtg.toml"
 
 #=================================================
+# SETUP WEB INTERFACE (index.php + nginx)
+#=================================================
+ynh_script_progression "Setting up web interface..."
+
+# Copy the status page
+cp "$conf_dir/index.php" "$install_dir/index.php"
+chown "$app:" "$install_dir/index.php"
+
+# Setup nginx configuration
+ynh_config_add_nginx
+
+#=================================================
 # SYSTEMD + SERVICE REGISTRATION
 #=================================================
 ynh_script_progression "Setting up systemd service..."

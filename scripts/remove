@@ -19,6 +19,13 @@ fi
 ynh_config_remove_systemd
 
 #=================================================
+# REMOVE NGINX CONFIGURATION
+#=================================================
+ynh_script_progression "Removing nginx configuration..."
+
+ynh_config_remove_nginx
+
+#=================================================
 # REMOVE CONFIGURATION FILES
 # Note: system user, install_dir, apt packages, and firewall ports
 # are automatically removed by YunoHost via [resources]
@@ -26,6 +33,7 @@ ynh_config_remove_systemd
 ynh_script_progression "Removing configuration files..."
 
 ynh_safe_rm "$install_dir/conf"
+ynh_safe_rm "$install_dir/index.php"
 
 #=================================================
 # END OF SCRIPT

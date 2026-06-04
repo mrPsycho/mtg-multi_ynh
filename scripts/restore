@@ -8,6 +8,13 @@ ynh_script_progression "Restoring the app main directory..."
 ynh_restore "$install_dir"
 
 #=================================================
+# RESTORE NGINX CONFIGURATION
+#=================================================
+ynh_script_progression "Restoring nginx configuration..."
+
+ynh_config_add_nginx
+
+#=================================================
 # RESTORE SYSTEM CONFIGURATIONS
 #=================================================
 ynh_script_progression "Restoring system configurations related to $app..."

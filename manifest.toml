@@ -6,7 +6,7 @@ name = "mtg-multi"
 description.en = "Fork of mtg with multi-secret support and per-user stats"
 description.fr = "Fork de mtg avec support multi-secret et statistiques par utilisateur"
 
-version = "1.11.0~ynh2"
+version = "1.11.0~ynh3"
 
 maintainers = ["mrpsycho"]
 
@@ -20,7 +20,7 @@ yunohost = ">= 12.1.38"
 helpers_version = "2.1"
 architectures = "all"
 multi_instance = false
-type = "service"
+type = "web"
 
 ldap = "not_relevant"
 
@@ -61,6 +61,8 @@ disk = "50M"
     [resources.ports]
         [resources.ports.main]
         default = "3128"
+
+    [resources.nginx]
 
     [resources.sources.main]
     # x86_64 / amd64
