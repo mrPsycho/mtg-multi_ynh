@@ -1,5 +1,5 @@
 [Unit]
-Description=MTProto proxy for Telegram
+Description=MTProto proxy for Telegram (mtg-multi)
 After=network.target
 
 [Service]
@@ -7,7 +7,7 @@ Type=simple
 User=__APP__
 Group=__APP__
 WorkingDirectory=__INSTALL_DIR__/
-ExecStart=__INSTALL_DIR__/mtg run __INSTALL_DIR__/conf/mtg.toml
+ExecStart=__INSTALL_DIR__/mtg-multi run __INSTALL_DIR__/conf/mtg.toml
 StandardOutput=append:/var/log/__APP__/__APP__.log
 StandardError=inherit
 Restart=always

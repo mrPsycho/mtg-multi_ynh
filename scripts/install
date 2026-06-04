@@ -9,13 +9,13 @@ source /usr/share/yunohost/helpers
 conf_dir=$install_dir/conf
 
 #=================================================
-# FETCH AND INSTALL MTG BINARY
+# FETCH AND INSTALL MTG-MULTI BINARY
 #=================================================
 ynh_script_progression "Setting up source files..."
 
 ynh_setup_source --dest_dir="$install_dir"
 
-chmod +x "$install_dir/mtg"
+chmod +x "$install_dir/mtg-multi"
 
 #=================================================
 # GENERATE/VALIDATE SECRET
@@ -26,8 +26,8 @@ if [[ "$secret" == ee* ]]; then
     mtg_secret="$secret"
 else
     ynh_print_info "Generating MTProto secret for fronting domain: $secret"
-    mtg_secret=$("$install_dir/mtg" generate-secret "$secret")
-    [ -z "$mtg_secret" ] && ynh_die "Failed to generate mtg secret for domain $secret"
+    mtg_secret=$("$install_dir/mtg-multi" generate-secret --hex "$secret")
+    [ -z "$mtg_secret" ] && ynh_die "Failed to generate mtg-multi secret for domain $secret"
     ynh_print_info "Generated secret: $mtg_secret"
 fi
 
@@ -55,7 +55,7 @@ ynh_script_progression "Setting up systemd service..."
 ynh_config_add_systemd
 
 yunohost service add "$app" \
-    --description "MTProto proxy for Telegram" \
+    --description "MTProto proxy for Telegram (mtg-multi)" \
     --needs_exposed_ports "$port" \
     --log="/var/log/$app/mtg.log" 
 

@@ -1,19 +1,19 @@
 #:schema https://raw.githubusercontent.com/YunoHost/apps/master/schemas/manifest.v2.schema.json
 
 packaging_format = 2
-id = "mtg"
-name = "mtg"
-description.en = "Highly-opinionated MTPROTO proxy for Telegram"
-description.fr = "Proxy MTProto pour Telegram"
+id = "mtg-multi"
+name = "mtg-multi"
+description.en = "Fork of mtg with multi-secret support and per-user stats"
+description.fr = "Fork de mtg avec support multi-secret et statistiques par utilisateur"
 
-version = "2.2.8~ynh1"
+version = "1.11.0~ynh1"
 
 maintainers = ["mrpsycho"]
 
 [upstream]
 license = "MIT"
-code = "https://github.com/9seconds/mtg"
-admindoc = "https://github.com/9seconds/mtg/blob/master/README.md"
+code = "https://github.com/dolonet/mtg-multi"
+admindoc = "https://github.com/dolonet/mtg-multi/blob/master/README.md"
 
 [integration]
 yunohost = ">= 12.1.38"
@@ -60,14 +60,8 @@ disk = "50M"
 
     [resources.sources.main]
     # x86_64 / amd64
-    amd64.url = "https://github.com/9seconds/mtg/releases/download/v2.2.8/mtg-2.2.8-linux-amd64.tar.gz"
-    amd64.sha256 = "7ef19d079d85f4e00d4f8334ec1f3f3c8718e3d0ed1f3109ea9a8673138a2102"
-    # i386
-    i386.url = "https://github.com/9seconds/mtg/releases/download/v2.2.8/mtg-2.2.8-linux-386.tar.gz"
-    i386.sha256 = "99c2f177730271b88d8f2404b2cf27d5ee997685f6d9118d4c8cac9c5aaedf50"
+    amd64.url = "https://github.com/dolonet/mtg-multi/releases/download/v1.11.0/mtg-multi-1.11.0-linux-amd64.tar.gz"
+    amd64.sha256 = "aa6d9f402b9e395e7782027f9a522ac0f3e1f85c46f444843174b27a210dab35"
     # arm64 / aarch64
-    arm64.url = "https://github.com/9seconds/mtg/releases/download/v2.2.8/mtg-2.2.8-linux-arm64.tar.gz"
-    arm64.sha256 = "562a94dd4cafcb8f179b76cfeafb76da12747c8e230bc76235bf8746cc189644"
-    # armhf / armv7
-    armhf.url = "https://github.com/9seconds/mtg/releases/download/v2.2.8/mtg-2.2.8-linux-armv7.tar.gz"
-    armhf.sha256 = "494ee3794ed00201e5333b478236ce2f434b33f2d3445f227debe9fc386bbef0"
+    arm64.url = "https://github.com/dolonet/mtg-multi/releases/download/v1.11.0/mtg-multi-1.11.0-linux-arm64.tar.gz"
+    arm64.sha256 = "87e9c5d293cdb0c1dbc988690bab99bc3f16526c7196e812d33354bbfd9a6002"

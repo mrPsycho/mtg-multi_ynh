@@ -22,9 +22,15 @@ ynh_script_progression "Upgrading source files..."
 
 # $install_dir is set automatically from [resources.install_dir]
 ynh_setup_source --dest_dir="$install_dir" --full_replace --keep="conf"
-  
-chmod +x "$install_dir/mtg"
-chown "$app:" "$install_dir/mtg"
+
+chmod +x "$install_dir/mtg-multi"
+chown "$app:" "$install_dir/mtg-multi"
+
+# Remove old mtg binary if present (migration from original mtg)
+if [ -f "$install_dir/mtg" ]; then
+    ynh_print_info "Removing old mtg binary (migrating to mtg-multi)..."
+    rm -f "$install_dir/mtg"
+fi
 
 #=================================================
 # UPDATE A CONFIG FILE
@@ -51,7 +57,7 @@ chown $app: /var/log/$app
 ynh_config_add_systemd
 
 yunohost service add "$app" \
-    --description "MTProto proxy for Telegram" \
+    --description "MTProto proxy for Telegram (mtg-multi)" \
     --needs_exposed_ports "$port" \
     --log="/var/log/$app/mtg.log"
 

@@ -4,34 +4,34 @@ It shall NOT be edited by hand.
 -->
 
 <h1>
-  <img src="https://raw.githubusercontent.com/YunoHost/apps/main/logos/mtg.png" width="32px" alt="Logo of mtg">
-  mtg, packaged for YunoHost
+  <img src="https://raw.githubusercontent.com/YunoHost/apps/main/logos/mtg.png" width="32px" alt="Logo of mtg-multi">
+  mtg-multi, packaged for YunoHost
 </h1>
 
-Highly-opinionated MTPROTO proxy for Telegram
+Fork of mtg with multi-secret support and per-user stats
 
-[![Version: 2.2.8~ynh1](https://img.shields.io/badge/Version-2.2.8~ynh1-rgb(18,138,11)?style=for-the-badge)](https://ci-apps.yunohost.org/ci/apps/mtg/)
+[![Version: 1.11.0~ynh1](https://img.shields.io/badge/Version-1.11.0~ynh1-rgb(18,138,11)?style=for-the-badge)](https://ci-apps.yunohost.org/ci/apps/mtg-multi/)
 
 <div align="center">
-<a href="https://apps.yunohost.org/app/mtg"><img height="100px" src="https://github.com/YunoHost/yunohost-artwork/raw/refs/heads/main/badges/neopossum-badges/badge_more_info_on_the_appstore.svg"/></a>
-<a href="https://github.com/YunoHost-Apps/mtg_ynh/issues"><img height="100px" src="https://github.com/YunoHost/yunohost-artwork/raw/refs/heads/main/badges/neopossum-badges/badge_report_an_issue.svg"/></a>
+<a href="https://apps.yunohost.org/app/mtg-multi"><img height="100px" src="https://github.com/YunoHost/yunohost-artwork/raw/refs/heads/main/badges/neopossum-badges/badge_more_info_on_the_appstore.svg"/></a>
+<a href="https://github.com/YunoHost-Apps/mtg-multi_ynh/issues"><img height="100px" src="https://github.com/YunoHost/yunohost-artwork/raw/refs/heads/main/badges/neopossum-badges/badge_report_an_issue.svg"/></a>
 </div>
 
 ## 📦 Developer info
 
-[![Automatic tests level](https://apps.yunohost.org/badge/cilevel/mtg)](https://ci-apps.yunohost.org/ci/apps/mtg/)
+[![Automatic tests level](https://apps.yunohost.org/badge/cilevel/mtg-multi)](https://ci-apps.yunohost.org/ci/apps/mtg-multi/)
 
-🛠️ Upstream mtg repository: <https://github.com/9seconds/mtg>
+🛠️ Upstream mtg-multi repository: <https://github.com/dolonet/mtg-multi>
 
-Pull request are welcome and should target the [`testing` branch](https://github.com/YunoHost-Apps/mtg_ynh/tree/testing).
+Pull request are welcome and should target the [`testing` branch](https://github.com/YunoHost-Apps/mtg-multi_ynh/tree/testing).
 
 The `testing` branch can be tested using:
 ```
 # fresh install:
-sudo yunohost app install https://github.com/YunoHost-Apps/mtg_ynh/tree/testing
+sudo yunohost app install https://github.com/YunoHost-Apps/mtg-multi_ynh/tree/testing
 
 # upgrade an existing install:
-sudo yunohost app upgrade mtg -u https://github.com/YunoHost-Apps/mtg_ynh/tree/testing
+sudo yunohost app upgrade mtg-multi -u https://github.com/YunoHost-Apps/mtg-multi_ynh/tree/testing
 ```
 
 ### 📚 App packaging documentation
