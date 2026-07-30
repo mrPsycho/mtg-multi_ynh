@@ -9,6 +9,7 @@ source /usr/share/yunohost/helpers
 
 version=$(ynh_read_manifest "version")
 domain="$new_domain"
+path="$new_path"
 
 #=================================================
 # MODIFY URL IN NGINX CONF AND THE STATUS PAGE

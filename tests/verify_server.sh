@@ -29,16 +29,35 @@ admin_secret="$(grep -oP '^"administrator" = "\K[0-9a-f]+' /var/www/mtg-multi/co
 [ -n "$admin_secret" ] && ok "administrator has a secret" || ko "administrator has NO secret"
 
 echo
-echo "=== 4. secrets are not reachable over HTTP ==="
+echo "=== 4. the config files are never served, whatever the sub-path ==="
+# index.php answers every URL under the app path, so a 200 is expected; what
+# matters is that the raw TOML never reaches the client.
 for p in /conf/secrets.toml /conf/mtg.toml /../conf/secrets.toml; do
-    code="$(curl -s -o /dev/null -w '%{http_code}' "$url$p")"
-    [ "$code" = 200 ] && ko "$p returned 200" || ok "$p -> HTTP $code"
+    body="$(curl -sL "$url$p")"
+    if grep -qE "^\"[a-z0-9_.-]+\" = \"ee[0-9a-f]+\"" <<<"$body"; then
+        ko "$p served raw TOML"
+    else
+        ok "$p served no raw TOML"
+    fi
 done
 
 echo
 echo "=== 5. unauthenticated access leaks nothing ==="
 body="$(curl -sL "$url/")"
 if echo "$body" | grep -qF "$admin_secret"; then ko "secret leaked to anonymous visitor"; else ok "no secret in anonymous response"; fi
+
+code="$(curl -s -o /dev/null -w '%{http_code}' "$url")"
+[ "$code" = 301 ] && ok "$url -> HTTP 301 (sub_path redirect)" || ko "$url -> HTTP $code, expected 301"
+
+echo
+echo "=== 5b. self-service reset plumbing ==="
+for u in "$app-reload.path" "$app-reload.service"; do
+    [ -f "/etc/systemd/system/$u" ] && ok "$u installed" || ko "$u MISSING"
+done
+[ "$(systemctl is-active "$app-reload.path")" = active ] \
+    && ok "$app-reload.path is active" || ko "$app-reload.path is NOT active"
+stat -c '%n %a %U:%G' "/var/www/$app/conf/.reload" 2>/dev/null \
+    && ok "reload trigger exists" || ko "reload trigger MISSING"
 
 echo
 echo "=== 6. per-user rendering (simulating the SSO header) ==="

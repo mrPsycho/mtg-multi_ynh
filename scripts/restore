@@ -29,6 +29,7 @@ ynh_script_progression "Restoring system configurations related to $app..."
 ynh_config_add_phpfpm
 ynh_config_add_nginx
 ynh_config_add_systemd
+mtg_add_reload_units
 ynh_config_add_logrotate "/var/log/$app/$app.log"
 
 yunohost service add "$app" \

@@ -48,6 +48,26 @@ mtg_add_config() {
     mtg_apply_secrets
 }
 
+# index.php runs as $app and may therefore rewrite the secret files, but not
+# restart the service. A systemd path unit watching a trigger file does it.
+mtg_add_reload_units() {
+    touch "$install_dir/conf/.reload"
+    chown "$app:$app" "$install_dir/conf/.reload"
+    chmod 600 "$install_dir/conf/.reload"
+
+    ynh_config_add --template="reload.service" --destination="/etc/systemd/system/$app-reload.service"
+    ynh_config_add --template="reload.path" --destination="/etc/systemd/system/$app-reload.path"
+    systemctl daemon-reload
+    systemctl enable --now "$app-reload.path" --quiet
+}
+
+mtg_remove_reload_units() {
+    systemctl disable --now "$app-reload.path" --quiet 2>/dev/null || true
+    ynh_safe_rm "/etc/systemd/system/$app-reload.path"
+    ynh_safe_rm "/etc/systemd/system/$app-reload.service"
+    systemctl daemon-reload
+}
+
 # The post_user_create / post_user_delete hooks live in the package's hooks/
 # folder: YunoHost installs them into /etc/yunohost/hooks.d/ itself on install,
 # upgrade and restore, and removes them on uninstall. Doing it from the scripts

@@ -1,0 +1,6 @@
+[Unit]
+Description=Restart __APP__ after a self-service MTProto key reset
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/systemctl restart __APP__.service

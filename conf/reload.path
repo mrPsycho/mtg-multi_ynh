@@ -1,0 +1,11 @@
+[Unit]
+Description=Watch for MTProto key resets made from __APP__'s web page
+
+[Path]
+# index.php runs as __APP__ and cannot restart the service itself; it writes
+# this trigger file instead.
+PathModified=__INSTALL_DIR__/conf/.reload
+Unit=__APP__-reload.service
+
+[Install]
+WantedBy=multi-user.target

@@ -67,6 +67,7 @@ ynh_config_add_nginx
 #=================================================
 
 ynh_config_add_systemd
+mtg_add_reload_units
 ynh_config_add_logrotate "/var/log/$app/$app.log"
 
 yunohost service add "$app" \

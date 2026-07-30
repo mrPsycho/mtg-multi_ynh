@@ -1,6 +1,8 @@
 #!/bin/bash
-# Renders conf/index.php in a PHP 8.2 container and checks that a user only
-# ever sees its own secret. Requires podman (or docker).
+# Renders conf/index.php in a PHP 8.2 container: checks that a user only ever
+# sees its own secret, that the Telegram instructions are shown, and that the
+# self-service key reset is CSRF-protected and rewrites both config files.
+# Requires podman (or docker).
 
 set -euo pipefail
 
@@ -12,35 +14,67 @@ runtime="$(command -v podman || command -v docker)"
 image="docker.io/library/php:8.2-cli"
 
 install_dir="/srv/app"
+frontend_domain="storage.googleapis.com"
+frontend_hex="73746f726167652e676f6f676c65617069732e636f6d"
 mkdir -p "$work/app/conf" "$work/app/www"
 
-alice_secret="ee1111111111111111111111111111111173746f726167652e676f6f676c65"
-bob_secret="ee2222222222222222222222222222222273746f726167652e676f6f676c65"
-cat >"$work/app/conf/secrets.toml" <<EOF
+alice_secret="ee11111111111111111111111111111111$frontend_hex"
+bob_secret="ee22222222222222222222222222222222$frontend_hex"
+
+write_fixtures() {
+    cat >"$work/app/conf/secrets.toml" <<EOF
 "alice" = "$alice_secret"
 "bob" = "$bob_secret"
 EOF
+    cat >"$work/app/conf/mtg.toml" <<EOF
+bind-to = "0.0.0.0:3128"
+
+[network]
+dns = "https://1.1.1.1"
+
+[secrets]
+"alice" = "$alice_secret"
+"bob" = "$bob_secret"
+EOF
+    rm -f "$work/app/conf/.reload"
+}
+write_fixtures
 
 sed -e "s|__VERSION__|1.11.0~ynh4|g" \
     -e "s|__INSTALL_DIR__|$install_dir|g" \
+    -e "s|__PATH__|/mtg-multi|g" \
     -e "s|__DOMAIN__|proxy.example.tld|g" \
     -e "s|__PORT__|3128|g" \
     -e "s|__PORT_API__|9090|g" \
-    -e "s|__FRONTEND_DOMAIN__|storage.googleapis.com|g" \
+    -e "s|__FRONTEND_DOMAIN__|$frontend_domain|g" \
     "$repo/conf/index.php" >"$work/app/www/index.php"
 
 cat >"$work/render.php" <<'EOF'
 <?php
+// argv: user, request method, urlencoded body
 if (($argv[1] ?? '') !== '') {
     $_SERVER['REMOTE_USER'] = $argv[1];
+}
+$_SERVER['REQUEST_METHOD'] = ($argv[2] ?? '') !== '' ? $argv[2] : 'GET';
+if (($argv[3] ?? '') !== '') {
+    parse_str($argv[3], $_POST);
 }
 require '/srv/app/www/index.php';
 EOF
 
 render() {
-    "$runtime" run --rm -v "$work:/srv:ro,z" "$image" php /srv/render.php "$1" 2>&1
+    "$runtime" run --rm -v "$work:/srv:z" "$image" php /srv/render.php "$1" "${2:-GET}" "${3:-}" 2>&1
 }
 
+token_for() { # user, current secret
+    printf '%s' "$1" | openssl dgst -sha256 -hmac "$2$install_dir" -r | cut -d' ' -f1
+}
+
+secret_of() { # user
+    grep -oP "^\"$1\" = \"\K[0-9a-f]+" "$work/app/conf/secrets.toml" || true
+}
+
+# --- 1. per-user isolation ---------------------------------------------
 out_alice="$(render alice)"
 grep -q "$alice_secret" <<<"$out_alice" || { echo "FAIL: alice cannot see her own secret"; exit 1; }
 echo "PASS: the logged-in user sees their own secret"
@@ -49,8 +83,17 @@ grep -q "$bob_secret" <<<"$out_alice" && { echo "FAIL: alice can see bob's secre
 echo "PASS: other users' secrets are never rendered"
 
 grep -q "t.me/proxy" <<<"$out_alice" || { echo "FAIL: missing Telegram link"; exit 1; }
-echo "PASS: Telegram connection link is generated"
+grep -q "tg://proxy" <<<"$out_alice" || { echo "FAIL: missing tg:// deep link"; exit 1; }
+echo "PASS: Telegram connection links are generated"
 
+# --- 2. setup instructions ---------------------------------------------
+grep -q "Как настроить Telegram" <<<"$out_alice" || { echo "FAIL: no setup instructions"; exit 1; }
+for needle in Android iOS Desktop MTProto; do
+    grep -q "$needle" <<<"$out_alice" || { echo "FAIL: instructions miss $needle"; exit 1; }
+done
+echo "PASS: manual Telegram setup instructions are shown"
+
+# --- 3. anonymous / unknown users --------------------------------------
 out_anon="$(render '')"
 grep -q "403" <<<"$out_anon" || { echo "FAIL: anonymous access not rejected"; exit 1; }
 grep -qE "$alice_secret|$bob_secret" <<<"$out_anon" && { echo "FAIL: secret leaked to anonymous"; exit 1; }
@@ -60,6 +103,41 @@ out_unknown="$(render dave)"
 grep -qE "$alice_secret|$bob_secret" <<<"$out_unknown" && { echo "FAIL: secret leaked to unknown user"; exit 1; }
 grep -q "не создан секрет" <<<"$out_unknown" || { echo "FAIL: missing 'no secret' notice"; exit 1; }
 echo "PASS: a user without a secret gets a notice, not someone else's key"
+
+# --- 4. reset is CSRF-protected ----------------------------------------
+out_bad="$(render alice POST 'action=reset&token=deadbeef')"
+grep -q "400" <<<"$out_bad" || { echo "FAIL: reset accepted without a valid token"; exit 1; }
+[ "$(secret_of alice)" = "$alice_secret" ] || { echo "FAIL: secret changed despite a bad token"; exit 1; }
+echo "PASS: reset without a valid CSRF token is refused"
+
+out_other="$(render alice POST "action=reset&token=$(token_for bob "$bob_secret")")"
+grep -q "400" <<<"$out_other" || { echo "FAIL: another user's token was accepted"; exit 1; }
+echo "PASS: a token minted for another user is refused"
+
+# --- 5. reset regenerates only the caller's secret ----------------------
+render alice POST "action=reset&token=$(token_for alice "$alice_secret")" >/dev/null
+new_alice="$(secret_of alice)"
+[ -n "$new_alice" ] && [ "$new_alice" != "$alice_secret" ] || { echo "FAIL: secret was not regenerated"; exit 1; }
+[ "$(secret_of bob)" = "$bob_secret" ] || { echo "FAIL: reset clobbered bob's secret"; exit 1; }
+echo "PASS: reset regenerates only the caller's secret"
+
+grep -qE "^ee[0-9a-f]{32}$frontend_hex\$" <<<"$new_alice" \
+    || { echo "FAIL: new secret is not in mtg-multi --hex format: $new_alice"; exit 1; }
+echo "PASS: the new secret has the same format as 'mtg-multi generate-secret --hex'"
+
+python3 -c "import tomllib,sys; d=tomllib.load(open(sys.argv[1],'rb')); assert sorted(d['secrets'])==['alice','bob'], d['secrets']; assert d['secrets']['alice']==sys.argv[2], 'mtg.toml not updated'; assert d['bind-to']=='0.0.0.0:3128', 'header lost'" \
+    "$work/app/conf/mtg.toml" "$new_alice"
+echo "PASS: mtg.toml is rebuilt, keeps its header and stays valid TOML"
+
+[ -s "$work/app/conf/.reload" ] || { echo "FAIL: reload trigger not written"; exit 1; }
+echo "PASS: the systemd reload trigger is written"
+
+# --- 6. a user without a secret can create one -------------------------
+write_fixtures
+render dave POST "action=reset&token=$(token_for dave '')" >/dev/null
+[ -n "$(secret_of dave)" ] || { echo "FAIL: user without a secret could not create one"; exit 1; }
+[ "$(secret_of alice)" = "$alice_secret" ] || { echo "FAIL: creating a secret clobbered alice"; exit 1; }
+echo "PASS: a user without a secret can create one"
 
 echo
 echo "All web-interface tests passed."
