@@ -1,40 +1,45 @@
+## Per-user access
+
+Every YunoHost user automatically gets its own MTProto secret. Users retrieve it
+themselves on the app's page, which is behind the YunoHost SSO: a user only ever
+sees its own key, plus its own traffic statistics.
+
+Secrets are kept in sync automatically: creating a YunoHost user generates a new
+secret, deleting a user revokes it. Restrict who gets access with the app's
+permission (`Users` group) in the webadmin.
+
 ## Configuration
 
-The configuration file is at `/etc/mtg/mtg.toml`. Key settings:
+The configuration file is at `/var/www/mtg-multi/conf/mtg.toml` and the
+`username -> secret` mapping at `/var/www/mtg-multi/conf/secrets.toml`. Both are
+only readable by the app's system user and are never served over HTTP.
 
-- `secret` — The MTProto secret. Changing this requires restarting the service.
+Key settings:
+
 - `bind-to` — The port the proxy listens on.
 - `api-bind-to` — The stats API endpoint (per-user connection counts and traffic).
 - `[network] dns` — The DNS resolver used for IP resolution.
 - `[throttle]` — Automatic per-user connection limits to protect the server from overload.
 - `[stats.prometheus]` — Enable/disable the Prometheus metrics endpoint.
+- `[secrets]` — Generated from `secrets.toml`, do not edit by hand.
 
 After editing the config file, restart the service:
 ```bash
 sudo systemctl restart mtg-multi
 ```
 
-## Getting the connection link for Telegram
-
-After installation, find your proxy settings:
-```bash
-sudo cat /etc/mtg/mtg.toml
-```
-
-Use the `secret` and your server's public IP + port to connect from Telegram:
-**Settings → Data and Storage → Proxy Settings → Add Proxy → MTProto**
-
 ## Multi-user support
 
-mtg-multi supports multiple secrets per instance. To add additional users, edit the config file and add a `[secrets]` section:
+mtg-multi supports multiple secrets per instance. The package writes one entry
+per YunoHost user:
 
 ```toml
 [secrets]
-alice = "ee367a189aee18fa31c190054efd4a8e..."
-bob   = "ee0123456789abcdef0123456789abcd..."
+"alice" = "ee367a189aee18fa31c190054efd4a8e..."
+"bob" = "ee0123456789abcdef0123456789abcd..."
 ```
 
-Each key is a user name, used for per-user stats tracking. Secrets may use different hostnames for per-user domain fronting.
+Each key is a user name, used for per-user stats tracking.
 
 ## Stats API
 

@@ -6,7 +6,7 @@ name = "mtg-multi"
 description.en = "Fork of mtg with multi-secret support and per-user stats"
 description.fr = "Fork de mtg avec support multi-secret et statistiques par utilisateur"
 
-version = "1.11.0~ynh3"
+version = "1.11.0~ynh4"
 
 maintainers = ["mrpsycho"]
 
@@ -18,22 +18,35 @@ admindoc = "https://github.com/dolonet/mtg-multi/blob/master/README.md"
 [integration]
 yunohost = ">= 12.1.38"
 helpers_version = "2.1"
-architectures = "all"
+architectures = ["amd64", "arm64"]
 multi_instance = false
-type = "service"
 
-ldap = "not_relevant"
+# Users don't log in *into* mtg with their YunoHost credentials...
+ldap = false
+# ...but the personal page showing their own secret is behind the YunoHost SSO.
+sso = true
 
 ram.build = "50M"
 ram.runtime = "50M"
 disk = "50M"
 
 [install]
+    [install.domain]
+    type = "domain"
+
+    [install.path]
+    type = "path"
+    default = "/mtg-multi"
+
+    [install.init_main_permission]
+    type = "group"
+    default = "all_users"
+
     [install.port]
-    type = "string"
+    type = "number"
     ask.en = "Choose a port for the proxy to bind to"
     ask.fr = "Choisissez un port auquel le proxy doit se connecter"
-    default = "3128"
+    default = 3128
 
     [install.dns]
     type = "string"
@@ -43,9 +56,9 @@ disk = "50M"
 
     [install.frontend_domain]
     type = "string"
-    ask.en = "Enter a frontend domain to generate a valid secret (e.g. google.com). Leave empty to use a default fake secret."
-    ask.fr = "Saisissez un domaine frontend pour générer un secret valide (ex: google.com). Laissez vide pour utiliser un secret factice par défaut."
-    default = ""
+    ask.en = "Domain to use for domain fronting, used to generate every user's secret"
+    ask.fr = "Domaine à utiliser pour le domain fronting, utilisé pour générer le secret de chaque utilisateur"
+    default = "storage.googleapis.com"
 
     [install.prometheus]
     type = "boolean"
@@ -58,9 +71,25 @@ disk = "50M"
 
     [resources.install_dir]
 
+    [resources.permissions]
+        [resources.permissions.main]
+        url = "/"
+
+    [resources.apt]
+    packages = "php8.2-fpm"
+
     [resources.ports]
+        # The proxy port must be reachable from the internet (MTProto is TCP-only)
         [resources.ports.main]
-        default = "3128"
+        default = 3128
+        exposed = "TCP"
+
+        # Stats API and Prometheus exporter stay on loopback
+        [resources.ports.api]
+        default = 9090
+
+        [resources.ports.prometheus]
+        default = 3129
 
     [resources.sources.main]
     # x86_64 / amd64

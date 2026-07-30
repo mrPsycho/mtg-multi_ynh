@@ -1,0 +1,29 @@
+#!/bin/bash
+# Revoke the MTProto secret of a deleted YunoHost user.
+
+set -euo pipefail
+
+app="__APP__"
+install_dir="__INSTALL_DIR__"
+
+secrets_file="$install_dir/conf/secrets.toml"
+config_file="$install_dir/conf/mtg.toml"
+
+user="${1:-${YNH_USER_USERNAME:-}}"
+[[ "$user" =~ ^[a-z0-9_.-]+$ ]] || exit 0
+[ -f "$config_file" ] || exit 0
+[ -f "$secrets_file" ] || exit 0
+
+if ! grep -qF "\"$user\" = \"" "$secrets_file"; then
+    exit 0
+fi
+grep -vF "\"$user\" = \"" "$secrets_file" >"$secrets_file.new" || true
+mv "$secrets_file.new" "$secrets_file"
+
+sed -i '/^\[secrets\]$/q' "$config_file"
+cat "$secrets_file" >>"$config_file"
+
+chown "$app:$app" "$secrets_file" "$config_file"
+chmod 600 "$secrets_file" "$config_file"
+
+systemctl restart "$app"

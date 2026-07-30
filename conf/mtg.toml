@@ -1,6 +1,8 @@
 debug = false
+# Binding on all interfaces is intentional: this is an MTProto proxy, clients
+# connect to it directly and it is not reverse-proxied by nginx.
 bind-to = "0.0.0.0:__PORT__"
-api-bind-to = "127.0.0.1:9090"
+api-bind-to = "127.0.0.1:__PORT_API__"
 
 [network]
 dns = "https://__DNS__"
@@ -11,12 +13,11 @@ check-interval = "5s"
 
 [stats.prometheus]
 enabled = __PROM_ENABLED__
-bind-to = "127.0.0.1:3129"
+bind-to = "127.0.0.1:__PORT_PROMETHEUS__"
 http-path = "/"
 metric-prefix = "mtg"
 
-# Default fake secret (placeholder — replace with a real generated secret!)
-# Run: mtg-multi generate-secret <domain>
-# Or use the web interface to add your own secrets.
+# One named secret per YunoHost user, maintained by the package.
+# [secrets] MUST stay the last section: in TOML every key written after a
+# section header belongs to that table.
 [secrets]
-"default" = "!!!SECRET!!!"

@@ -3,9 +3,9 @@
 test_format = 1.0
 
 [default]
-    args.port = "3128"
+    args.port = 3128
     args.dns = "1.1.1.1"
-    args.frontend_domain = "google.com"
+    args.frontend_domain = "storage.googleapis.com"
     args.prometheus = false
 
-    exclude = ["install.root", "install.multi"]
+    exclude = ["install.multi"]

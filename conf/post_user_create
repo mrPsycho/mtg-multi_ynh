@@ -1,0 +1,32 @@
+#!/bin/bash
+# Give a freshly created YunoHost user its own MTProto secret.
+
+set -euo pipefail
+
+app="__APP__"
+install_dir="__INSTALL_DIR__"
+frontend_domain="__FRONTEND_DOMAIN__"
+
+secrets_file="$install_dir/conf/secrets.toml"
+config_file="$install_dir/conf/mtg.toml"
+
+user="${1:-${YNH_USER_USERNAME:-}}"
+[[ "$user" =~ ^[a-z0-9_.-]+$ ]] || exit 0
+[ -f "$config_file" ] || exit 0
+
+touch "$secrets_file"
+if grep -qF "\"$user\" = \"" "$secrets_file"; then
+    exit 0
+fi
+
+secret="$("$install_dir/mtg-multi" generate-secret --hex "$frontend_domain" | tr -d '[:space:]')"
+[ -n "$secret" ] || exit 1
+echo "\"$user\" = \"$secret\"" >>"$secrets_file"
+
+sed -i '/^\[secrets\]$/q' "$config_file"
+cat "$secrets_file" >>"$config_file"
+
+chown "$app:$app" "$secrets_file" "$config_file"
+chmod 600 "$secrets_file" "$config_file"
+
+systemctl restart "$app"

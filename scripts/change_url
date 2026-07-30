@@ -1,0 +1,27 @@
+#!/bin/bash
+
+#=================================================
+# COMMON VARIABLES AND HELPERS
+#=================================================
+
+source _common.sh
+source /usr/share/yunohost/helpers
+
+version=$(ynh_read_manifest "version")
+domain="$new_domain"
+
+#=================================================
+# MODIFY URL IN NGINX CONF AND THE STATUS PAGE
+#=================================================
+ynh_script_progression "Updating $app's web configuration..."
+
+ynh_config_add --template="index.php" --destination="$install_dir/www/index.php"
+chown "$app:$app" "$install_dir/www/index.php"
+
+ynh_config_change_url_nginx
+
+#=================================================
+# END OF SCRIPT
+#=================================================
+
+ynh_script_progression "Change of URL completed for $app"

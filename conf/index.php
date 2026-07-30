@@ -1,9 +1,84 @@
+<?php
+// Personal MTProto page: shows ONLY the secret of the SSO-authenticated user.
+// $_SERVER['REMOTE_USER'] is set by nginx from the Ynh-User header injected by
+// the YunoHost SSO (see fastcgi_params_with_auth).
+
+const APP_VERSION     = '__VERSION__';
+const APP_INSTALL_DIR = '__INSTALL_DIR__';
+const PROXY_HOST      = '__DOMAIN__';
+const PROXY_PORT      = '__PORT__';
+const API_PORT        = '__PORT_API__';
+const FRONTEND_DOMAIN = '__FRONTEND_DOMAIN__';
+
+function h(?string $s): string
+{
+    return htmlspecialchars((string) $s, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+}
+
+function secret_for(string $user): ?string
+{
+    $file = APP_INSTALL_DIR . '/conf/secrets.toml';
+    if (!is_readable($file)) {
+        return null;
+    }
+    foreach (file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
+        if (preg_match('/^"([^"]+)"\s*=\s*"([0-9a-fA-F]+)"$/', $line, $m) && $m[1] === $user) {
+            return $m[2];
+        }
+    }
+    return null;
+}
+
+function stats(): ?array
+{
+    $ctx = stream_context_create(['http' => ['timeout' => 2, 'ignore_errors' => true]]);
+    $raw = @file_get_contents('http://127.0.0.1:' . API_PORT . '/stats', false, $ctx);
+    if ($raw === false) {
+        return null;
+    }
+    $data = json_decode($raw, true);
+    return is_array($data) ? $data : null;
+}
+
+function human_bytes($bytes): string
+{
+    $bytes = (float) $bytes;
+    $units = ['B', 'KiB', 'MiB', 'GiB', 'TiB'];
+    $i = 0;
+    while ($bytes >= 1024 && $i < count($units) - 1) {
+        $bytes /= 1024;
+        $i++;
+    }
+    return round($bytes, $i ? 1 : 0) . ' ' . $units[$i];
+}
+
+$user = $_SERVER['REMOTE_USER'] ?? '';
+if (!preg_match('/^[a-z0-9_.-]+$/i', $user)) {
+    http_response_code(403);
+    header('Content-Type: text/plain; charset=utf-8');
+    exit("403 — Требуется авторизация через портал YunoHost.\n");
+}
+
+$secret = secret_for($user);
+$all    = stats();
+$mine   = ($all !== null && isset($all['users'][$user])) ? $all['users'][$user] : null;
+
+$tg_link = null;
+if ($secret !== null) {
+    $tg_link = 'https://t.me/proxy?' . http_build_query([
+        'server' => PROXY_HOST,
+        'port'   => PROXY_PORT,
+        'secret' => $secret,
+    ]);
+}
+?>
 <!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MTG-Multi Proxy — статус</title>
+    <meta name="robots" content="noindex, nofollow">
+    <title>MTG-Multi Proxy — мой доступ</title>
     <style>
         :root {
             --bg: #f5f7fa;
@@ -63,7 +138,6 @@
             font-size: 0.85rem;
             font-weight: 600;
         }
-        .status-badge.loading { background: #fef5e7; color: var(--warning); }
         .status-badge.online { background: #e8f8f0; color: var(--success); }
         .status-badge.offline { background: #fde8e8; color: var(--danger); }
         .info-grid {
@@ -91,24 +165,6 @@
             font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
             font-size: 0.9rem;
         }
-        .secret-item {
-            padding: 12px;
-            background: var(--bg);
-            border-radius: 8px;
-            margin-bottom: 8px;
-        }
-        .secret-item:last-child { margin-bottom: 0; }
-        .secret-item .secret-name {
-            font-weight: 600;
-            font-size: 0.9rem;
-            margin-bottom: 4px;
-        }
-        .secret-item .secret-value {
-            font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
-            font-size: 0.85rem;
-            color: var(--text-muted);
-            word-break: break-all;
-        }
         .connection-info {
             background: #eaf2f8;
             border: 1px solid #d4e6f1;
@@ -124,6 +180,16 @@
             font-size: 0.9rem;
             margin-top: 8px;
             word-break: break-all;
+        }
+        .btn {
+            display: inline-block;
+            margin-top: 12px;
+            padding: 10px 18px;
+            border-radius: 8px;
+            background: var(--accent);
+            color: #fff;
+            text-decoration: none;
+            font-weight: 600;
         }
         .error-box {
             background: #fde8e8;
@@ -152,215 +218,76 @@
             MTG-Multi Proxy
             <small>MTProto proxy для Telegram</small>
         </h1>
-        <p class="subtitle" id="subtitle">
-            Загрузка статуса прокси-сервера...
+        <p class="subtitle">
+            Персональный доступ для пользователя <strong><?= h($user) ?></strong>
         </p>
 
-        <!-- Статус сервера -->
         <div class="card">
-            <h2>Статус сервера</h2>
-            <div id="server-status">
-                <span class="status-badge loading">🟡 Загрузка...</span>
-                <p style="margin-top: 12px;">Подключение к API статистики...</p>
-            </div>
+            <h2>Мой ключ доступа</h2>
+            <?php if ($secret === null): ?>
+                <div class="error-box">
+                    Для вашей учётной записи ещё не создан секрет.
+                    Обратитесь к администратору сервера.
+                </div>
+            <?php else: ?>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <div class="label">Сервер</div>
+                        <div class="value mono"><?= h(PROXY_HOST) ?></div>
+                    </div>
+                    <div class="info-item">
+                        <div class="label">Порт</div>
+                        <div class="value mono"><?= h(PROXY_PORT) ?></div>
+                    </div>
+                </div>
+                <div class="connection-info">
+                    <strong>🔑 Секрет (только ваш, не передавайте его другим)</strong>
+                    <code><?= h($secret) ?></code>
+                    <a class="btn" href="<?= h($tg_link) ?>">Подключить в Telegram</a>
+                    <p style="margin-top: 8px; font-size: 0.85rem; color: var(--text-muted);">
+                        Если домен не резолвится, замените его на IP-адрес сервера.
+                        Domain fronting: <?= h(FRONTEND_DOMAIN) ?>
+                    </p>
+                </div>
+            <?php endif; ?>
         </div>
 
-        <!-- Параметры подключения -->
         <div class="card">
-            <h2>Параметры подключения</h2>
-            <div class="info-grid" id="params-grid">
-                <div class="info-item">
-                    <div class="label">Порт прокси</div>
-                    <div class="value mono" id="proxy-port">—</div>
-                </div>
-                <div class="info-item">
-                    <div class="label">DNS резольвер</div>
-                    <div class="value mono" id="dns-resolver">—</div>
-                </div>
-                <div class="info-item">
-                    <div class="label">Prometheus метрики</div>
-                    <div class="value" id="prometheus-status">—</div>
-                </div>
-                <div class="info-item">
-                    <div class="label">API порт</div>
-                    <div class="value mono" id="api-port">—</div>
-                </div>
-            </div>
-
-            <div class="connection-info">
-                <strong>🔗 Подключение к прокси</strong>
-                <p style="margin-top: 8px; font-size: 0.9rem;">
-                    Используйте этот адрес для подключения в Telegram:
+            <h2>Моя статистика</h2>
+            <?php if ($all === null): ?>
+                <span class="status-badge offline">🔴 Прокси недоступен</span>
+                <p style="margin-top: 12px;">
+                    Не удалось получить статистику. Возможно, сервис остановлен или ещё запускается.
                 </p>
-                <code id="connection-string">server = ...</code>
-                <p style="margin-top: 8px; font-size: 0.85rem; color: var(--text-muted);">
-                    Замените домен на IP-адрес сервера, если DNS не настроен.
-                </p>
-            </div>
-        </div>
-
-        <!-- Секреты -->
-        <div class="card">
-            <h2>MTProto секреты</h2>
-            <div id="secrets-list">
-                <p style="color: var(--warning);">⚠️ Загрузка секретов...</p>
-            </div>
-        </div>
-
-        <!-- Информация о системе -->
-        <div class="card">
-            <h2>Информация о системе</h2>
-            <div class="info-grid">
-                <div class="info-item">
-                    <div class="label">Версия приложения</div>
-                    <div class="value">1.11.0~ynh3</div>
+            <?php else: ?>
+                <span class="status-badge online">🟢 Онлайн</span>
+                <div class="info-grid" style="margin-top: 16px;">
+                    <div class="info-item">
+                        <div class="label">Активных соединений</div>
+                        <div class="value"><?= h((string) ($mine['connections'] ?? 0)) ?></div>
+                    </div>
+                    <div class="info-item">
+                        <div class="label">Последняя активность</div>
+                        <div class="value" style="font-size: 0.95rem;">
+                            <?= h($mine['last_seen'] ?? '—') ?>
+                        </div>
+                    </div>
+                    <div class="info-item">
+                        <div class="label">Принято</div>
+                        <div class="value"><?= h(human_bytes($mine['bytes_in'] ?? 0)) ?></div>
+                    </div>
+                    <div class="info-item">
+                        <div class="label">Отправлено</div>
+                        <div class="value"><?= h(human_bytes($mine['bytes_out'] ?? 0)) ?></div>
+                    </div>
                 </div>
-                <div class="info-item">
-                    <div class="label">Директория установки</div>
-                    <div class="value mono" style="font-size: 0.8rem;" id="install-dir">—</div>
-                </div>
-            </div>
+            <?php endif; ?>
         </div>
 
         <div class="footer">
-            MTG-Multi Proxy для YunoHost — 
+            MTG-Multi Proxy для YunoHost <?= h(APP_VERSION) ?> —
             <a href="https://github.com/dolonet/mtg-multi" target="_blank" rel="noopener">GitHub</a>
         </div>
     </div>
-
-    <script>
-    // Parse TOML-like config from the API
-    async function fetchConfig() {
-        try {
-            // Try to fetch stats from the API
-            const statsResp = await fetch('http://127.0.0.1:9090/stats');
-            if (statsResp.ok) {
-                const stats = await statsResp.json();
-                document.getElementById('server-status').innerHTML = 
-                    '<span class="status-badge online">🟢 Онлайн</span>' +
-                    '<p style="margin-top: 12px;">' +
-                    'Прокси-сервер работает и принимает подключения.<br>' +
-                    '<small>Запущен: ' + new Date(stats.started_at).toLocaleString() + 
-                    ' | Соединений: ' + stats.total_connections + '</small>' +
-                    '</p>';
-                document.getElementById('subtitle').textContent = 'Прокси-сервер работает';
-            }
-        } catch (e) {
-            document.getElementById('server-status').innerHTML = 
-                '<span class="status-badge offline">🔴 Статус неизвестен</span>' +
-                '<p style="margin-top: 12px;">' +
-                'Не удалось подключиться к API статистики. Возможно, сервер ещё запускается.' +
-                '</p>';
-        }
-    }
-
-    // Fetch config file and parse it client-side
-    async function fetchConfigFile() {
-        try {
-            const resp = await fetch('mtg.toml');
-            if (!resp.ok) throw new Error('Config not accessible');
-            const text = await resp.text();
-            const config = parseTOML(text);
-            
-            // Extract proxy port
-            const bindTo = config['bind-to'] || '0.0.0.0:3128';
-            const proxyPort = bindTo.split(':').pop();
-            document.getElementById('proxy-port').textContent = proxyPort;
-            
-            // Extract API port
-            const apiBind = config['api-bind-to'] || '127.0.0.1:9090';
-            const apiPort = apiBind.split(':').pop();
-            document.getElementById('api-port').textContent = apiPort;
-            
-            // Extract DNS
-            const dns = config['network']?.dns || '1.1.1.1';
-            document.getElementById('dns-resolver').textContent = dns;
-            
-            // Extract Prometheus
-            const promEnabled = config['stats.prometheus']?.enabled;
-            document.getElementById('prometheus-status').textContent = 
-                promEnabled ? '✅ Включены' : '❌ Отключены';
-            
-            // Extract secrets
-            const secrets = config['secrets'] || {};
-            const secretsDiv = document.getElementById('secrets-list');
-            if (Object.keys(secrets).length === 0) {
-                secretsDiv.innerHTML = 
-                    '<p style="color: var(--warning);">⚠️ Секреты не настроены.</p>';
-            } else {
-                let html = '';
-                for (const [name, secret] of Object.entries(secrets)) {
-                    html += '<div class="secret-item">' +
-                        '<div class="secret-name">🔑 ' + escapeHtml(name) + '</div>' +
-                        '<div class="secret-value">' + escapeHtml(secret) + '</div>' +
-                        '</div>';
-                }
-                secretsDiv.innerHTML = html;
-            }
-            
-            // Build connection string
-            const domain = window.location.hostname || 'mtg.local';
-            document.getElementById('connection-string').textContent = 
-                'server = ' + domain + ':' + proxyPort;
-            
-            // Install dir
-            document.getElementById('install-dir').textContent = '/var/www/mtg-multi';
-            
-        } catch (e) {
-            console.error('Failed to load config:', e);
-            document.getElementById('params-grid').innerHTML = 
-                '<div class="error-box">' +
-                'Не удалось загрузить конфигурацию. ' +
-                'Убедитесь, что файл mtg.toml доступен для чтения.' +
-                '</div>';
-        }
-    }
-
-    // Simple TOML parser (handles our config structure)
-    function parseTOML(text) {
-        const result = {};
-        let currentSection = result;
-        
-        text.split('\n').forEach(line => {
-            line = line.trim();
-            if (!line || line.startsWith('#')) return;
-            
-            // Section header
-            const sectionMatch = line.match(/^\[([^\]]+)\]$/);
-            if (sectionMatch) {
-                const parts = sectionMatch[1].split('.');
-                currentSection = result;
-                parts.forEach(part => {
-                    if (!currentSection[part]) currentSection[part] = {};
-                    currentSection = currentSection[part];
-                });
-                return;
-            }
-            
-            // Key = "value"
-            const kvMatch = line.match(/^(?:'([^']+)'|"([^"]+)"|([a-zA-Z0-9_-]+))\s*=\s*(?:"([^"]*)"|'([^']*)'|(true|false|\d+(?:\.\d+)?))$/);
-            if (kvMatch) {
-                const key = kvMatch[1] || kvMatch[2] || kvMatch[3];
-                let value = kvMatch[4] || kvMatch[5] || kvMatch[6];
-                if (value === 'true') value = true;
-                else if (value === 'false') value = false;
-                else if (!isNaN(value) && value !== '') value = Number(value);
-                currentSection[key] = value;
-            }
-        });
-        
-        return result;
-    }
-
-    function escapeHtml(str) {
-        const div = document.createElement('div');
-        div.textContent = str;
-        return div.innerHTML;
-    }
-
-    // Load everything on page load
-    fetchConfig();
-    fetchConfigFile();
-    </script>
 </body>
 </html>

@@ -4,9 +4,10 @@
 # COMMON VARIABLES AND HELPERS
 #=================================================
 
+source _common.sh
 source /usr/share/yunohost/helpers
 
-conf_dir=$install_dir/conf
+version=$(ynh_read_manifest "version")
 
 #=================================================
 # FETCH AND INSTALL MTG-MULTI BINARY
@@ -16,68 +17,46 @@ ynh_script_progression "Setting up source files..."
 ynh_setup_source --dest_dir="$install_dir"
 
 chmod +x "$install_dir/mtg-multi"
+chown "$app:$app" "$install_dir/mtg-multi"
+
+mkdir -p "$install_dir/conf" "$install_dir/www"
+chown "$app:$app" "$install_dir/conf" "$install_dir/www"
+chmod 700 "$install_dir/conf"
+
+mkdir -p "/var/log/$app"
+chown -R "$app:$app" "/var/log/$app"
 
 #=================================================
-# GENERATE SECRET
+# GENERATE ONE SECRET PER YUNOHOST USER
 #=================================================
-ynh_script_progression "Generating MTProto secret..."
+ynh_script_progression "Generating one MTProto secret per user..."
 
-if [ -n "$frontend_domain" ]; then
-    # Generate a valid secret using the frontend domain
-    secret=$("$install_dir/mtg-multi" generate-secret "$frontend_domain" 2>/dev/null | tail -n1)
-    if [ -z "$secret" ]; then
-        ynh_print_warn "Failed to generate secret from domain, using default fake secret"
-        secret="DefaultSecretReplaceMe"
-    else
-        ynh_print_info "Secret successfully generated from domain $frontend_domain"
-    fi
-else
-    ynh_print_info "No frontend domain provided — using default fake secret (replace it later!)"
-    secret="DefaultSecretReplaceMe"
-fi
+mtg_sync_secrets
 
 #=================================================
 # WRITE CONFIGURATION
 #=================================================
 ynh_script_progression "Adding $app's configuration files..."
 
-mkdir -p "$conf_dir"
-
-# Create log directory
-mkdir -p /var/log/$app
-chown -R "$app:" "/var/log/$app"
-
-[ "$prometheus" = "1" ] && prom_enabled="true" || prom_enabled="false"
-
-# Generate config via ynh_config_add (replaces __PORT__, __DNS__, __PROM_ENABLED__)
-# then inject secret via sed to avoid issues with '=' in base64 secrets
-# !!!SECRET!!! is used instead of __SECRET__ to avoid ynh_config_add from processing it
-ynh_config_add --template="mtg.toml" --destination="$conf_dir/mtg.toml"
-sed -i "s|!!!SECRET!!!|$secret|g" "$conf_dir/mtg.toml"
+mtg_add_config
 
 #=================================================
-# SETUP WEB INTERFACE (index.html + nginx)
+# SETUP WEB INTERFACE (index.php + php-fpm + nginx)
 #=================================================
 ynh_script_progression "Setting up web interface..."
 
-# Copy the status page from the package conf directory
-cp "$YNH_APP_BASEDIR/conf/index.php" "$install_dir/index.php"
-chown "$app:" "$install_dir/index.php"
+ynh_config_add --template="index.php" --destination="$install_dir/www/index.php"
+chown "$app:$app" "$install_dir/www/index.php"
 
-# Get the first YunoHost domain for the nginx config
-domain=$(yunohost domain list --output-as json 2>/dev/null | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('domains',[])[0])" 2>/dev/null)
-if [ -z "$domain" ]; then
-    ynh_print_warn "No domain found, skipping nginx configuration"
-else
-    # Setup nginx configuration manually (service type, so no ynh_config_add_nginx)
-    # Set path for the nginx template (service apps use root path)
-    path="/"
-    nginx_conf_path="/etc/nginx/conf.d/$domain.d/$app.conf"
-    mkdir -p "/etc/nginx/conf.d/$domain.d"
-    ynh_config_add --template="nginx.conf" --destination="$nginx_conf_path"
-    ynh_store_file_checksum "$nginx_conf_path"
-    ynh_systemctl --service=nginx --action=reload
-fi
+ynh_config_add_phpfpm
+ynh_config_add_nginx
+
+#=================================================
+# KEEP SECRETS IN SYNC WITH YUNOHOST USERS
+#=================================================
+ynh_script_progression "Installing user hooks..."
+
+mtg_add_hooks
 
 #=================================================
 # SYSTEMD + SERVICE REGISTRATION
@@ -85,15 +64,12 @@ fi
 ynh_script_progression "Setting up systemd service..."
 
 ynh_config_add_systemd
+ynh_config_add_logrotate "/var/log/$app/$app.log"
 
 yunohost service add "$app" \
     --description "MTProto proxy for Telegram (mtg-multi)" \
     --needs_exposed_ports "$port" \
-    --log="/var/log/$app/mtg.log"
-
-# Open port in firewall
-ynh_script_progression "Opening port $port in firewall..."
-yunohost firewall allow Both "$port" 2>&1 || ynh_print_warn "Could not open port $port in firewall"
+    --log="/var/log/$app/$app.log"
 
 #=================================================
 # START SYSTEMD SERVICE

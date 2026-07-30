@@ -12,7 +12,6 @@ StandardOutput=append:/var/log/__APP__/__APP__.log
 StandardError=inherit
 Restart=always
 RestartSec=3
-
 # Sandboxing options to harden security
 NoNewPrivileges=yes
 PrivateTmp=yes
@@ -20,14 +19,18 @@ PrivateDevices=yes
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
 RestrictNamespaces=yes
 RestrictRealtime=yes
+RestrictSUIDSGID=yes
 DevicePolicy=closed
 ProtectClock=yes
+ProtectHome=yes
 ProtectHostname=yes
 ProtectProc=invisible
 ProtectSystem=full
 ProtectControlGroups=yes
+ProtectKernelLogs=yes
 ProtectKernelModules=yes
 ProtectKernelTunables=yes
+ReadWritePaths=__INSTALL_DIR__ /var/log/__APP__
 LockPersonality=yes
 SystemCallArchitectures=native
 SystemCallFilter=~@clock @debug @module @mount @obsolete @reboot @setuid @swap @cpu-emulation @privileged

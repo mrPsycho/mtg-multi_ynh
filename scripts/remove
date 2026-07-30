@@ -4,6 +4,7 @@
 # COMMON VARIABLES AND HELPERS
 #=================================================
 
+source _common.sh
 source /usr/share/yunohost/helpers
 
 #=================================================
@@ -17,29 +18,24 @@ if ynh_hide_warnings yunohost service status "$app" >/dev/null; then
 fi
 
 ynh_config_remove_systemd
+ynh_config_remove_logrotate
 
 #=================================================
-# REMOVE NGINX CONFIGURATION
+# REMOVE WEB CONFIGURATION
 #=================================================
-ynh_script_progression "Removing nginx configuration..."
+ynh_script_progression "Removing nginx and php-fpm configuration..."
 
-# Remove nginx config manually (service type, so no ynh_config_remove_nginx)
-domain=$(yunohost domain list --output-as json 2>/dev/null | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('domains',[])[0])" 2>/dev/null)
-if [ -n "$domain" ]; then
-    nginx_conf_path="/etc/nginx/conf.d/$domain.d/$app.conf"
-    ynh_safe_rm "$nginx_conf_path"
-    ynh_systemctl --service=nginx --action=reload
-fi
+ynh_config_remove_nginx
+ynh_config_remove_phpfpm
 
 #=================================================
-# REMOVE CONFIGURATION FILES
-# Note: system user, install_dir, apt packages, and firewall ports
+# REMOVE USER HOOKS
+# Note: system user, install_dir, apt packages, firewall ports and logs
 # are automatically removed by YunoHost via [resources]
 #=================================================
-ynh_script_progression "Removing configuration files..."
+ynh_script_progression "Removing user hooks..."
 
-ynh_safe_rm "$install_dir/conf"
-ynh_safe_rm "$install_dir/index.php"
+mtg_remove_hooks
 
 #=================================================
 # END OF SCRIPT

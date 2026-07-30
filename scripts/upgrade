@@ -4,9 +4,10 @@
 # COMMON VARIABLES AND HELPERS
 #=================================================
 
+source _common.sh
 source /usr/share/yunohost/helpers
 
-conf_dir=$install_dir/conf
+version=$(ynh_read_manifest "version")
 
 #=================================================
 # STOP SERVICE
@@ -20,101 +21,60 @@ ynh_systemctl --action=stop
 #=================================================
 ynh_script_progression "Upgrading source files..."
 
-# $install_dir is set automatically from [resources.install_dir]
 ynh_setup_source --dest_dir="$install_dir" --full_replace --keep="conf"
 
 chmod +x "$install_dir/mtg-multi"
-chown "$app:" "$install_dir/mtg-multi"
+chown "$app:$app" "$install_dir/mtg-multi"
 
-# Remove old mtg binary if present (migration from original mtg)
-if [ -f "$install_dir/mtg" ]; then
-    ynh_print_info "Removing old mtg binary (migrating to mtg-multi)..."
-    rm -f "$install_dir/mtg"
-fi
+# Leftovers from the pre-multi-user layout
+ynh_safe_rm "$install_dir/mtg"
+ynh_safe_rm "$install_dir/index.php"
+
+mkdir -p "$install_dir/conf" "$install_dir/www"
+chown "$app:$app" "$install_dir/conf" "$install_dir/www"
+chmod 700 "$install_dir/conf"
+
+mkdir -p "/var/log/$app"
+chown -R "$app:$app" "/var/log/$app"
 
 #=================================================
-# PRESERVE OR GENERATE SECRET
+# SYNC SECRETS WITH THE CURRENT USER LIST
 #=================================================
-ynh_script_progression "Checking MTProto secret..."
+ynh_script_progression "Synchronizing per-user MTProto secrets..."
 
-# Try to read existing secret from the current config
-# Supports both formats:
-#   old: <base64secret> = "DefaultSecretReplaceMe"
-#   new: "default" = "<base64secret>"
-if [ -f "$conf_dir/mtg.toml" ]; then
-    # First try new format: "key" = "value" (only in [secrets] section)
-    existing_secret=$(sed -n '/^\[secrets\]/,/^\[/{/^\[secrets\]/!p}' "$conf_dir/mtg.toml" | grep -oP '^\s*"[^"]*"\s*=\s*"\K[^"]+' | head -n1)
-    # If that looks like a placeholder, try old format: key = "value"
-    if [ -z "$existing_secret" ] || [ "$existing_secret" = "DefaultSecretReplaceMe" ]; then
-        existing_secret=$(grep -oP '^\s*\S+\s*=\s*"\K[^"]+' "$conf_dir/mtg.toml" | head -n1)
-    fi
-fi
-
-if [ -n "$existing_secret" ] && [ "$existing_secret" != "DefaultSecretReplaceMe" ]; then
-    # Keep the existing valid secret
-    secret="$existing_secret"
-    ynh_print_info "Preserving existing secret"
-else
-    # No valid secret found — use default fake secret
-    ynh_print_info "No valid secret found — using default fake secret (replace it later!)"
-    secret="DefaultSecretReplaceMe"
-fi
+mtg_sync_secrets
 
 #=================================================
 # UPDATE A CONFIG FILE
 #=================================================
 ynh_script_progression "Updating $app's configuration files..."
 
-[ "$prometheus" = "1" ] && prom_enabled="true" || prom_enabled="false"
-
-# Generate config via ynh_config_add (replaces __PORT__, __DNS__, __PROM_ENABLED__)
-# then inject secret via sed to avoid issues with '=' in base64 secrets
-# !!!SECRET!!! is used instead of __SECRET__ to avoid ynh_config_add from processing it
-ynh_config_add --template="mtg.toml" --destination="$conf_dir/mtg.toml"
-sed -i "s|!!!SECRET!!!|$secret|g" "$conf_dir/mtg.toml"
-
-# Ensure log directory exists
-mkdir -p /var/log/$app
-chown $app: /var/log/$app
+mtg_add_config
 
 #=================================================
-# UPDATE WEB INTERFACE (index.html + nginx)
+# UPDATE WEB INTERFACE (index.php + php-fpm + nginx)
 #=================================================
 ynh_script_progression "Updating web interface..."
 
-# Copy the status page from the package conf directory
-cp "$YNH_APP_BASEDIR/conf/index.php" "$install_dir/index.php"
-chown "$app:" "$install_dir/index.php"
+ynh_config_add --template="index.php" --destination="$install_dir/www/index.php"
+chown "$app:$app" "$install_dir/www/index.php"
 
-# Get the first YunoHost domain for the nginx config
-domain=$(yunohost domain list --output-as json 2>/dev/null | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('domains',[])[0])" 2>/dev/null)
-if [ -z "$domain" ]; then
-    ynh_print_warn "No domain found, skipping nginx configuration"
-else
-    # Update nginx configuration manually (service type, so no ynh_config_add_nginx)
-    # Set path for the nginx template (service apps use root path)
-    path="/"
-    nginx_conf_path="/etc/nginx/conf.d/$domain.d/$app.conf"
-    mkdir -p "/etc/nginx/conf.d/$domain.d"
-    ynh_config_add --template="nginx.conf" --destination="$nginx_conf_path"
-    ynh_store_file_checksum "$nginx_conf_path"
-    ynh_systemctl --service=nginx --action=reload
-fi
+ynh_config_add_phpfpm
+ynh_config_add_nginx
+
+mtg_add_hooks
 
 #=================================================
 # UPDATE SYSTEMD CONFIG
 #=================================================
 
 ynh_config_add_systemd
+ynh_config_add_logrotate "/var/log/$app/$app.log"
 
 yunohost service add "$app" \
     --description "MTProto proxy for Telegram (mtg-multi)" \
     --needs_exposed_ports "$port" \
-    --log="/var/log/$app/mtg.log"
-
-# Open port in firewall
-ynh_script_progression "Opening port $port in firewall..."
-yunohost firewall allow Both "$port" 2>&1 || ynh_print_warn "Could not open port $port in firewall"
+    --log="/var/log/$app/$app.log"
 
 #=================================================
 # START SYSTEMD SERVICE
