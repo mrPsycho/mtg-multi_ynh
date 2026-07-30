@@ -31,8 +31,6 @@ ynh_config_add_nginx
 ynh_config_add_systemd
 ynh_config_add_logrotate "/var/log/$app/$app.log"
 
-mtg_add_hooks
-
 yunohost service add "$app" \
     --description "MTProto proxy for Telegram (mtg-multi)" \
     --needs_exposed_ports "$port" \

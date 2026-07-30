@@ -52,13 +52,6 @@ ynh_config_add_phpfpm
 ynh_config_add_nginx
 
 #=================================================
-# KEEP SECRETS IN SYNC WITH YUNOHOST USERS
-#=================================================
-ynh_script_progression "Installing user hooks..."
-
-mtg_add_hooks
-
-#=================================================
 # SYSTEMD + SERVICE REGISTRATION
 #=================================================
 ynh_script_progression "Setting up systemd service..."

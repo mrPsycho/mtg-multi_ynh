@@ -1,0 +1,48 @@
+#!/bin/bash
+# Give a freshly created YunoHost user its own MTProto secret.
+#
+# YunoHost installs this file as /etc/yunohost/hooks.d/post_user_create/50-mtg-multi
+# (see hook_add/hook_remove in yunohost/app.py), so it is NOT templated: settings
+# are read back from the app's settings.yml instead of being substituted at
+# install time. Calling the `yunohost` CLI here would deadlock on the global
+# lock held by `yunohost user create`, hence the direct file parsing.
+
+set -euo pipefail
+
+app="mtg-multi"
+settings="/etc/yunohost/apps/$app/settings.yml"
+[ -f "$settings" ] || exit 0
+
+setting() {
+    sed -n "s/^$1: *//p" "$settings" | head -n1 | tr -d "\"'"
+}
+
+install_dir="$(setting install_dir)"
+frontend_domain="$(setting frontend_domain)"
+[ -n "$install_dir" ] && [ -n "$frontend_domain" ] || exit 0
+
+secrets_file="$install_dir/conf/secrets.toml"
+config_file="$install_dir/conf/mtg.toml"
+
+user="${1:-${YNH_USER_USERNAME:-}}"
+[[ "$user" =~ ^[a-z0-9_.-]+$ ]] || exit 0
+[ -f "$config_file" ] || exit 0
+
+touch "$secrets_file"
+if grep -qF "\"$user\" = \"" "$secrets_file"; then
+    exit 0
+fi
+
+secret="$("$install_dir/mtg-multi" generate-secret --hex "$frontend_domain" | tr -d '[:space:]')"
+[ -n "$secret" ] || exit 1
+echo "\"$user\" = \"$secret\"" >>"$secrets_file"
+
+# [secrets] is the last section of mtg.toml, so truncating right after its header
+# and re-appending every entry is enough to rebuild the table.
+sed -i '/^\[secrets\]$/q' "$config_file"
+cat "$secrets_file" >>"$config_file"
+
+chown "$app:$app" "$secrets_file" "$config_file"
+chmod 600 "$secrets_file" "$config_file"
+
+systemctl restart "$app"

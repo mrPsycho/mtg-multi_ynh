@@ -89,10 +89,18 @@ mtg_add_config
 echo "PASS: re-sync preserves existing secrets"
 
 # --- 3. post_user_create hook ------------------------------------------
+# The real hooks read the app settings back from settings.yml, so fake one and
+# point the rendered copies at it.
+cat >"$work/settings.yml" <<EOF
+app: $app
+frontend_domain: $frontend_domain
+install_dir: $install_dir
+EOF
+
 render_hook() {
-    sed -e "s|__APP__|$app|g" -e "s|__INSTALL_DIR__|$install_dir|g" \
-        -e "s|__FRONTEND_DOMAIN__|$frontend_domain|g" \
-        -e "s|^systemctl restart .*|true|" -e "s|^chown |true |" "$repo/conf/$1" >"$work/$1"
+    sed -e "s|^settings=.*|settings=\"$work/settings.yml\"|" \
+        -e "s|^systemctl restart .*|true|" -e "s|^chown |true |" \
+        "$repo/hooks/$1" >"$work/$1"
     chmod +x "$work/$1"
 }
 render_hook post_user_create

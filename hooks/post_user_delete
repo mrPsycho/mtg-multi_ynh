@@ -1,10 +1,17 @@
 #!/bin/bash
 # Revoke the MTProto secret of a deleted YunoHost user.
+#
+# Installed by YunoHost as /etc/yunohost/hooks.d/post_user_delete/50-mtg-multi,
+# see the note in the post_user_create hook about why settings are parsed here.
 
 set -euo pipefail
 
-app="__APP__"
-install_dir="__INSTALL_DIR__"
+app="mtg-multi"
+settings="/etc/yunohost/apps/$app/settings.yml"
+[ -f "$settings" ] || exit 0
+
+install_dir="$(sed -n "s/^install_dir: *//p" "$settings" | head -n1 | tr -d "\"'")"
+[ -n "$install_dir" ] || exit 0
 
 secrets_file="$install_dir/conf/secrets.toml"
 config_file="$install_dir/conf/mtg.toml"

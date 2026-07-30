@@ -48,18 +48,7 @@ mtg_add_config() {
     mtg_apply_secrets
 }
 
-mtg_add_hooks() {
-    local hook
-    for hook in post_user_create post_user_delete; do
-        mkdir -p "/etc/yunohost/hooks.d/$hook"
-        ynh_config_add --template="$hook" --destination="/etc/yunohost/hooks.d/$hook/50-$app"
-        chmod 755 "/etc/yunohost/hooks.d/$hook/50-$app"
-    done
-}
-
-mtg_remove_hooks() {
-    local hook
-    for hook in post_user_create post_user_delete; do
-        ynh_safe_rm "/etc/yunohost/hooks.d/$hook/50-$app"
-    done
-}
+# The post_user_create / post_user_delete hooks live in the package's hooks/
+# folder: YunoHost installs them into /etc/yunohost/hooks.d/ itself on install,
+# upgrade and restore, and removes them on uninstall. Doing it from the scripts
+# would be pointless, as core runs hook_remove(app) after the install script.
