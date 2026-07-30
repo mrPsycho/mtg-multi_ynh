@@ -47,6 +47,11 @@ disk = "50M"
     ask.en = "Choose a port for the proxy to bind to"
     ask.fr = "Choisissez un port auquel le proxy doit se connecter"
     default = 3128
+    # Explicit bounds are mandatory: the webadmin turns an absent max into a
+    # `null` one and then rejects every value. 1024 is the floor because the
+    # service runs unprivileged.
+    min = 1024
+    max = 65535
 
     [install.dns]
     type = "string"
