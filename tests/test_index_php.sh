@@ -51,7 +51,7 @@ sed -e "s|__VERSION__|1.11.0~ynh4|g" \
 
 cat >"$work/render.php" <<'EOF'
 <?php
-// argv: user, request method, urlencoded body
+// argv: user, request method, urlencoded body, Accept-Language
 if (($argv[1] ?? '') !== '') {
     $_SERVER['REMOTE_USER'] = $argv[1];
 }
@@ -59,11 +59,14 @@ $_SERVER['REQUEST_METHOD'] = ($argv[2] ?? '') !== '' ? $argv[2] : 'GET';
 if (($argv[3] ?? '') !== '') {
     parse_str($argv[3], $_POST);
 }
+if (($argv[4] ?? '') !== '') {
+    $_SERVER['HTTP_ACCEPT_LANGUAGE'] = $argv[4];
+}
 require '/srv/app/www/index.php';
 EOF
 
 render() {
-    "$runtime" run --rm -v "$work:/srv:z" "$image" php /srv/render.php "$1" "${2:-GET}" "${3:-}" 2>&1
+    "$runtime" run --rm -v "$work:/srv:z" "$image" php /srv/render.php "$1" "${2:-GET}" "${3:-}" "${4:-}" 2>&1
 }
 
 token_for() { # user, current secret
@@ -87,11 +90,42 @@ grep -q "tg://proxy" <<<"$out_alice" || { echo "FAIL: missing tg:// deep link"; 
 echo "PASS: Telegram connection links are generated"
 
 # --- 2. setup instructions ---------------------------------------------
-grep -q "Как настроить Telegram" <<<"$out_alice" || { echo "FAIL: no setup instructions"; exit 1; }
+grep -q "How to set up Telegram" <<<"$out_alice" || { echo "FAIL: no setup instructions"; exit 1; }
 for needle in Android iOS Desktop MTProto; do
     grep -q "$needle" <<<"$out_alice" || { echo "FAIL: instructions miss $needle"; exit 1; }
 done
 echo "PASS: manual Telegram setup instructions are shown"
+
+# --- 2b. localisation --------------------------------------------------
+grep -q '<html lang="en"' <<<"$out_alice" || { echo "FAIL: default language is not English"; exit 1; }
+# The switcher deliberately labels each locale in its own language, so it is
+# the one place where non-English text is expected.
+sed '/lang-switch/,/<\/p>/d' <<<"$out_alice" | grep -qP '\p{Cyrillic}' \
+    && { echo "FAIL: Russian text in the default rendering"; exit 1; }
+echo "PASS: English is the default language"
+
+out_fr="$(render alice GET '' 'fr-FR,fr;q=0.9,en;q=0.8')"
+grep -q '<html lang="fr"' <<<"$out_fr" || { echo "FAIL: Accept-Language fr not honoured"; exit 1; }
+grep -q "Comment configurer Telegram" <<<"$out_fr" || { echo "FAIL: French strings missing"; exit 1; }
+echo "PASS: Accept-Language selects French"
+
+out_ru="$(render alice GET '' 'ru-RU,ru;q=0.9')"
+grep -q '<html lang="ru"' <<<"$out_ru" || { echo "FAIL: Accept-Language ru not honoured"; exit 1; }
+grep -q "Как настроить Telegram" <<<"$out_ru" || { echo "FAIL: Russian strings missing"; exit 1; }
+echo "PASS: Accept-Language selects Russian"
+
+out_xx="$(render alice GET '' 'de-DE,de;q=0.9,zh;q=0.8')"
+grep -q '<html lang="en"' <<<"$out_xx" || { echo "FAIL: unsupported locale did not fall back to English"; exit 1; }
+echo "PASS: an unsupported locale falls back to English"
+
+for code in en fr ru; do
+    grep -q "?lang=$code" <<<"$out_alice" || { echo "FAIL: no switcher link for $code"; exit 1; }
+done
+echo "PASS: the language switcher offers every locale"
+
+python3 "$repo/tests/check_translations.py" "$repo/conf/index.php" \
+    || { echo "FAIL: the translation tables do not define the same keys"; exit 1; }
+echo "PASS: every locale defines the same set of strings"
 
 # --- 3. anonymous / unknown users --------------------------------------
 out_anon="$(render '')"
@@ -101,7 +135,7 @@ echo "PASS: unauthenticated request is refused with 403 and leaks nothing"
 
 out_unknown="$(render dave)"
 grep -qE "$alice_secret|$bob_secret" <<<"$out_unknown" && { echo "FAIL: secret leaked to unknown user"; exit 1; }
-grep -q "не создан секрет" <<<"$out_unknown" || { echo "FAIL: missing 'no secret' notice"; exit 1; }
+grep -q "No secret has been generated" <<<"$out_unknown" || { echo "FAIL: missing 'no secret' notice"; exit 1; }
 echo "PASS: a user without a secret gets a notice, not someone else's key"
 
 # --- 4. reset is CSRF-protected ----------------------------------------
