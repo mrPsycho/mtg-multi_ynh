@@ -4,13 +4,13 @@ It shall NOT be edited by hand.
 -->
 
 <h1>
-  <img src="https://raw.githubusercontent.com/YunoHost/apps/main/logos/mtg.png" width="32px" alt="Logo of mtg-multi">
+  <img src="https://raw.githubusercontent.com/YunoHost/apps/main/logos/mtg-multi.png" width="32px" alt="Logo of mtg-multi">
   mtg-multi, packaged for YunoHost
 </h1>
 
 Fork of mtg with multi-secret support and per-user stats
 
-[![Version: 1.11.0~ynh1](https://img.shields.io/badge/Version-1.11.0~ynh1-rgb(18,138,11)?style=for-the-badge)](https://ci-apps.yunohost.org/ci/apps/mtg-multi/)
+[![Version: 1.11.0~ynh4](https://img.shields.io/badge/Version-1.11.0~ynh4-rgb(18,138,11)?style=for-the-badge)](https://ci-apps.yunohost.org/ci/apps/mtg-multi/)
 
 <div align="center">
 <a href="https://apps.yunohost.org/app/mtg-multi"><img height="100px" src="https://github.com/YunoHost/yunohost-artwork/raw/refs/heads/main/badges/neopossum-badges/badge_more_info_on_the_appstore.svg"/></a>
@@ -34,6 +34,11 @@ sudo yunohost app install https://github.com/YunoHost-Apps/mtg-multi_ynh/tree/te
 sudo yunohost app upgrade mtg-multi -u https://github.com/YunoHost-Apps/mtg-multi_ynh/tree/testing
 ```
 
+You can also switch to the testing branch to update from testing by default (as same as for APT when you chose to use a testing repos) with this command:
+```bash
+sudo yunohost app setting mtg-multi upgrade_channel -v testing
+```
+
 ### 📚 App packaging documentation
 
-Please see <https://doc.yunohost.org/packaging_apps> for more information.
+Please see <https://doc.yunohost.org/dev/packaging/> for more information.
